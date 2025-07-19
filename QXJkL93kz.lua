@@ -755,6 +755,11 @@ miscTab.new('label', {
     color = Color3.new(0, 1, 0)
 })
 
+local eventFarm = mainWindow.new({
+    text = 'AutoFarm Event',
+    padding = Vector2.new(10, 10)
+})
+
 local teleportTab = mainWindow.new({
     text = 'TP',
     padding = Vector2.new(10, 10)
@@ -918,13 +923,3 @@ local function toggleEventFarm(enabled)
         end
     end)
 end
-
-eventTab.new('switch', {
-    text = 'Auto Dungeon',
-    tooltip = 'Ingresa automaticamente a la dungeon'
-}).event:Connect(toggleEventFarm)
-
-local eventFarm = mainWindow.new({
-    text = 'AutoFarm Event',
-    padding = Vector2.new(10, 10)
-})
