@@ -728,7 +728,12 @@ local function toggleAutoSkill(enabled)
         print("Auto Skills habilitado")
         spawn(function()
             while autoSkillEnabled do
-                for _, key in ipairs({Enum.KeyCode.One, Enum.KeyCode.Two, Enum.KeyCode.Three}) do
+                for _, key in ipairs({
+                    Enum.KeyCode.One,
+                    Enum.KeyCode.Two,
+                    Enum.KeyCode.Three,
+                    Enum.KeyCode.Four -- 👈 añadida la tecla 4
+                }) do
                     virtualInput:SendKeyEvent(true, key, false, game)
                     wait(0.1)
                     virtualInput:SendKeyEvent(false, key, false, game)
@@ -744,10 +749,11 @@ end
 
 local autoSkillSwitch = miscTab.new('switch', {
     text = 'Auto Skills',
-    tooltip = 'Activa automáticamente habilidades 1, 2 y 3 del alma.'
+    tooltip = 'Activa automáticamente habilidades 1, 2, 3 y 4 del alma.'
 })
 autoSkillSwitch.set(false)
 autoSkillSwitch.event:Connect(toggleAutoSkill)
+
 
 
 miscTab.new('label', {
