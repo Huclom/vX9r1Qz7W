@@ -923,3 +923,8 @@ eventTab.new('switch', {
     text = 'Auto Dungeon',
     tooltip = 'Ingresa automaticamente a la dungeon'
 }).event:Connect(toggleEventFarm)
+
+local eventFarm = mainWindow.new({
+    text = 'AutoFarm Event',
+    padding = Vector2.new(10, 10)
+})
