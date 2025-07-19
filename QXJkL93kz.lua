@@ -755,30 +755,17 @@ miscTab.new('label', {
     color = Color3.new(0, 1, 0)
 })
 --------------------------------
--- 📦 Crear sección o categoría principal para el evento
-local eventFarm = mainWindow.new({
-    text = 'Event',
-    padding = Vector2.new(10, 10)
-})
-
--- 🔘 Switch en la pestaña de misc para controlar el autofarm
-local autoEventFarmSwitch = miscTab.new('switch', {
-    text = 'Auto Event',
-    tooltip = 'Empieza a farmear el evento'
-})
-
--- 🔁 Variable global para controlar el autofarm
 local eventFarmEnabled = false
 
--- 🧠 Lógica del autofarm del evento
 local function toggleEventFarm(enabled)
     eventFarmEnabled = enabled
     if not enabled then return end
 
     spawn(function()
         local player = game.Players.LocalPlayer
+        local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
+        local RESPAWN_THRESHOLD = 15
 
-        -- 🗺️ Coordenadas de plataformas de entrada
         local PLATFORMS = {
             Vector3.new(-50.58, -86.11, -11.80),
             Vector3.new(-78.31, -86.11, -12.76),
@@ -786,90 +773,67 @@ local function toggleEventFarm(enabled)
             Vector3.new(-111.82, -86.11, -69.44),
             Vector3.new(173.46, -161.01, -15.05),
             Vector3.new(175.81, -87.51, -213.72),
-            -- Agrega más si hay más plataformas
         }
 
-        local ENTER_THRESHOLD = 100
-        local EXIT_THRESHOLD = 150
-        local AT_PLATFORM_THRESHOLD = 10
-
-        -- Teletransporte básico
-        local function teleportTo(position)
-            local character = player.Character or player.CharacterAdded:Wait()
-            local hrp = character:WaitForChild("HumanoidRootPart")
-            hrp.CFrame = CFrame.new(position)
+        local function teleportTo(pos)
+            local char = player.Character or player.CharacterAdded:Wait()
+            local hrp = char:WaitForChild("HumanoidRootPart")
+            hrp.CFrame = CFrame.new(pos)
         end
 
-        -- Refrescar datos del personaje (útil si muere o cambia)
-        local function refreshCharacter()
-            local character = player.Character or player.CharacterAdded:Wait()
-            local humanoid = character:WaitForChild("Humanoid")
-            local hrp = character:WaitForChild("HumanoidRootPart")
-            return character, humanoid, hrp
+        local function getPosition()
+            local char = player.Character or player.CharacterAdded:Wait()
+            local hrp = char:WaitForChild("HumanoidRootPart")
+            return hrp.Position
         end
 
-        local step = 0
-        local cycleStart = nil
+        local function isAt(pos1, pos2, threshold)
+            return (pos1 - pos2).Magnitude <= threshold
+        end
+
         local platformIndex = 1
 
         while eventFarmEnabled do
-            local character, humanoid, hrp = refreshCharacter()
-
-            -- Teletransportarse a la plataforma correspondiente
             local currentPlatform = PLATFORMS[platformIndex]
+            print("[Event Farm] Teletransportando a plataforma #" .. platformIndex)
             teleportTo(currentPlatform)
-            wait(3)
 
-            if (hrp.Position - currentPlatform).Magnitude > AT_PLATFORM_THRESHOLD then
-                warn("[Event Farm] No se pudo posicionar en la plataforma " .. platformIndex)
-                platformIndex = (platformIndex % #PLATFORMS) + 1 -- Saltar a la siguiente
-                continue
-            end
+            local initialPos = getPosition()
+            local enteredDungeon = false
 
-            print("[Event Farm] Iniciando ciclo en plataforma #" .. platformIndex)
-
-            step = 0
-            cycleStart = tick()
-
-            while eventFarmEnabled do
-                local pos = hrp.Position
-
-                if step == 0 then
-                    -- Esperar a que se aleje de la plataforma (entrar al boss)
-                    if (pos - currentPlatform).Magnitude > ENTER_THRESHOLD then
-                        print("[Event Farm] Entraste a la dungeon.")
-                        step = 1
-                    end
-                elseif step == 1 then
-                    -- Detectar si terminó el boss y reapareció
-                    for _, respawnPos in pairs(BOSS_RESPAWNS) do
-                        if (pos - respawnPos).Magnitude < EXIT_THRESHOLD then
-                            print("[Event Farm] Dungeon finalizada. Regresando a la plataforma...")
-                            character, humanoid, hrp = refreshCharacter()
-                            teleportTo(currentPlatform)
-                            wait(3)
-
-                            if (hrp.Position - currentPlatform).Magnitude <= AT_PLATFORM_THRESHOLD then
-                                local duration = tick() - cycleStart
-                                print("⏱️ Duración del ciclo: " .. string.format("%.2f", duration) .. " segundos.")
-                                step = 0
-                                cycleStart = nil
-                                break
-                            end
-                        end
-                    end
-                end
-
+            for i = 1, 15 do
                 wait(1)
+                local currentPos = getPosition()
+                if (currentPos - initialPos).Magnitude > 10 then
+                    print("[Event Farm] Entraste a la dungeon desde plataforma #" .. platformIndex)
+                    enteredDungeon = true
+                    break
+                end
             end
 
-            -- Cambiar a la siguiente plataforma para el próximo ciclo
+            if enteredDungeon then
+                -- Esperar hasta reaparecer en la zona común de respawn
+                repeat
+                    wait(1)
+                    local pos = getPosition()
+                until isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD)
+
+                print("[Event Farm] Dungeon finalizada. Cambiando a la siguiente plataforma.")
+            else
+                print("[Event Farm] Plataforma #" .. platformIndex .. " en cooldown. Cambiando...")
+            end
+
             platformIndex = (platformIndex % #PLATFORMS) + 1
         end
     end)
 end
 
--- ✅ Conectar el switch con la función del autofarm
+-- 🔘 Switch UI
+local autoEventFarmSwitch = miscTab.new('switch', {
+    text = 'Auto Event',
+    tooltip = 'Empieza a farmear el evento'
+})
+
 autoEventFarmSwitch.OnChanged:Connect(function(state)
     toggleEventFarm(state)
 end)
