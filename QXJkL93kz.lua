@@ -1,6 +1,6 @@
 local ui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Singularity5490/rbimgui-2/main/rbimgui-2.lua'))()
 local mainWindow = ui.new({
-    text = 'Lootify Updated By Huclom',
+    text = 'Lo0tify Updated By Huclom',
     size = UDim2.new(0, 650, 0, 400)
 })
 mainWindow.open()
@@ -729,28 +729,28 @@ local skills = {
         name = "H1",
         key = Enum.KeyCode.One,
         cooldown = 8,
-        animTime = 1,
+        animTime = 2,
         lastUsed = 0
     },
     {
         name = "H2",
         key = Enum.KeyCode.Two,
         cooldown = 20,
-        animTime = 7,
+        animTime = 8,
         lastUsed = 0
     },
     {
         name = "H3",
         key = Enum.KeyCode.Three,
         cooldown = 15,
-        animTime = 4,
+        animTime = 5,
         lastUsed = 0
     },
     {
         name = "H4",
         key = Enum.KeyCode.Four,
         cooldown = 30,
-        animTime = 2,
+        animTime = 3,
         lastUsed = 0
     }
 }
