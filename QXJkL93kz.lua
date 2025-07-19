@@ -801,7 +801,7 @@ local function toggleEventFarm(enabled)
             local initialPos = getPosition()
             local enteredDungeon = false
 
-            for i = 1, 15 do
+            for i = 1, 17 do
                 wait(1)
                 local currentPos = getPosition()
                 if (currentPos - initialPos).Magnitude > 10 then
