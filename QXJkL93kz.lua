@@ -1,6 +1,6 @@
 local ui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Singularity5490/rbimgui-2/main/rbimgui-2.lua'))()
 local mainWindow = ui.new({
-    text = 'Lootify By Pancakq',
+    text = 'Lootify updated By Huclom',
     size = UDim2.new(0, 650, 0, 400)
 })
 mainWindow.open()
@@ -889,7 +889,7 @@ infoTab.new('label', {
 })
 
 infoTab.new('label', {
-    text = "Contact\n------------\nDiscord: Pancakq\nDiscord Server: https://discord.gg/J37PW97j6a",
+    text = "Contact\n------------\nDiscord: Huclom",
     color = Color3.new(1, 1, 1)
 })
 
