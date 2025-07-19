@@ -754,12 +754,91 @@ miscTab.new('label', {
     text = 'Note: Use Equip Best, Auto Roll, and Auto Sell for faster progression.',
     color = Color3.new(0, 1, 0)
 })
+--------------------------------
+local eventFarmEnabled = false
 
-local eventFarm = mainWindow.new({
-    text = 'Event',
-    padding = Vector2.new(10, 10)
+local function toggleEventFarm(enabled)
+    eventFarmEnabled = enabled
+    if not enabled then return end
+
+    spawn(function()
+        local player = game.Players.LocalPlayer
+        local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
+        local RESPAWN_THRESHOLD = 15
+
+        local PLATFORMS = {
+            Vector3.new(-50.58, -86.11, -11.80),
+            Vector3.new(-78.31, -86.11, -12.76),
+            Vector3.new(-112.42, -86.11, -41.93),
+            Vector3.new(-111.82, -86.11, -69.44),
+            Vector3.new(173.46, -161.01, -15.05),
+            Vector3.new(175.81, -87.51, -213.72),
+        }
+
+        local function teleportTo(pos)
+            local char = player.Character or player.CharacterAdded:Wait()
+            local hrp = char:WaitForChild("HumanoidRootPart")
+            hrp.CFrame = CFrame.new(pos)
+        end
+
+        local function getPosition()
+            local char = player.Character or player.CharacterAdded:Wait()
+            local hrp = char:WaitForChild("HumanoidRootPart")
+            return hrp.Position
+        end
+
+        local function isAt(pos1, pos2, threshold)
+            return (pos1 - pos2).Magnitude <= threshold
+        end
+
+        local platformIndex = 1
+
+        while eventFarmEnabled do
+            local currentPlatform = PLATFORMS[platformIndex]
+            print("[Event Farm] Teletransportando a plataforma #" .. platformIndex)
+            teleportTo(currentPlatform)
+
+            local initialPos = getPosition()
+            local enteredDungeon = false
+
+            for i = 1, 15 do
+                wait(1)
+                local currentPos = getPosition()
+                if (currentPos - initialPos).Magnitude > 10 then
+                    print("[Event Farm] Entraste a la dungeon desde plataforma #" .. platformIndex)
+                    enteredDungeon = true
+                    break
+                end
+            end
+
+            if enteredDungeon then
+                -- Esperar hasta reaparecer en la zona común de respawn
+                repeat
+                    wait(3)
+                    local pos = getPosition()
+                until isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD)
+
+                print("[Event Farm] Dungeon finalizada. Cambiando a la siguiente plataforma.")
+            else
+                print("[Event Farm] Plataforma #" .. platformIndex .. " en cooldown. Cambiando...")
+            end
+
+            platformIndex = (platformIndex % #PLATFORMS) + 1
+        end
+    end)
+end
+
+-- 🔘 Switch UI
+local autoEventFarmSwitch = miscTab.new('switch', {
+    text = 'Auto Event',
+    tooltip = 'Empieza a farmear el evento'
 })
 
+autoEventFarmSwitch.OnChanged:Connect(function(state)
+    toggleEventFarm(state)
+end)
+
+---------------------------------
 local teleportTab = mainWindow.new({
     text = 'Tps',
     padding = Vector2.new(10, 10)
