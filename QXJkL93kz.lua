@@ -834,7 +834,7 @@ local autoEventFarmSwitch = miscTab.new('switch', {
     tooltip = 'Empieza a farmear el evento'
 })
 
-autoEventFarmSwitch.OnChanged:Connect(function(state)
+autoEventFarmSwitch.event:Connect(function(state)
     toggleEventFarm(state)
 end)
 
