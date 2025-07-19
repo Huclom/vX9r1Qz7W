@@ -756,12 +756,12 @@ miscTab.new('label', {
 })
 
 local eventFarm = mainWindow.new({
-    text = 'AutoFarm Event',
+    text = 'Event',
     padding = Vector2.new(10, 10)
 })
 
 local teleportTab = mainWindow.new({
-    text = 'TP',
+    text = 'Tps',
     padding = Vector2.new(10, 10)
 })
 
@@ -823,103 +823,3 @@ infoTab.new('label', {
     color = Color3.new(1, 0, 0)
 })
 
-local function toggleEventFarm(enabled)
-    eventFarmEnabled = enabled
-    if not enabled then return end
-
-    spawn(function()
-        local player = game.Players.LocalPlayer
-
-        -- Coordenadas configurables
-        local PLATFORMS = {
-            Vector3.new(-392.63, 54.05, -742.08),
-            Vector3.new(-450.12, 54.05, -800.15),
-            Vector3.new(-500.25, 54.05, -720.35),
-            -- Agrega más plataformas si es necesario
-        }
-
-        local BOSS_RESPAWNS = {
-            Vector3.new(-400.41, 52.54, -809.72),
-            Vector3.new(-396.26, 53.31, -869.96),
-            Vector3.new(-380.10, 53.20, -830.42),
-            -- Agrega más posiciones de respawn
-        }
-
-        local ENTER_THRESHOLD = 100
-        local EXIT_THRESHOLD = 150
-        local AT_PLATFORM_THRESHOLD = 10
-
-        -- Función para teletransportarse
-        local function teleportTo(position)
-            local character = player.Character or player.CharacterAdded:Wait()
-            local hrp = character:WaitForChild("HumanoidRootPart")
-            hrp.CFrame = CFrame.new(position)
-        end
-
-        local function refreshCharacter()
-            local character = player.Character or player.CharacterAdded:Wait()
-            local humanoid = character:WaitForChild("Humanoid")
-            local hrp = character:WaitForChild("HumanoidRootPart")
-            return character, humanoid, hrp
-        end
-
-        local step = 0
-        local cycleStart = nil
-        local platformIndex = 1
-
-        while eventFarmEnabled do
-            local character, humanoid, hrp = refreshCharacter()
-
-            -- Ir a la plataforma actual
-            local currentPlatform = PLATFORMS[platformIndex]
-            teleportTo(currentPlatform)
-            wait(3)
-
-            if (hrp.Position - currentPlatform).Magnitude > AT_PLATFORM_THRESHOLD then
-                warn("[Event Farm] No se pudo posicionar en la plataforma " .. platformIndex)
-                platformIndex = (platformIndex % #PLATFORMS) + 1 -- Saltar a la siguiente plataforma
-                continue
-            end
-
-            print("[Event Farm] Iniciando ciclo en plataforma #" .. platformIndex)
-
-            step = 0
-            cycleStart = tick()
-
-            while eventFarmEnabled do
-                local pos = hrp.Position
-
-                if step == 0 then
-                    -- Espera a que el jugador entre a la dungeon (alejarse de la plataforma)
-                    if (pos - currentPlatform).Magnitude > ENTER_THRESHOLD then
-                        print("[Event Farm] Entraste a la dungeon.")
-                        step = 1
-                    end
-                elseif step == 1 then
-                    -- Espera a que reaparezca cerca de un respawn
-                    for _, respawnPos in pairs(BOSS_RESPAWNS) do
-                        if (pos - respawnPos).Magnitude < EXIT_THRESHOLD then
-                            print("[Event Farm] Dungeon finalizada. Regresando a la plataforma...")
-                            character, humanoid, hrp = refreshCharacter()
-                            teleportTo(currentPlatform)
-                            wait(3)
-
-                            if (hrp.Position - currentPlatform).Magnitude <= AT_PLATFORM_THRESHOLD then
-                                local duration = tick() - cycleStart
-                                print("⏱️ Duración del ciclo: " .. string.format("%.2f", duration) .. " segundos.")
-                                step = 0
-                                cycleStart = nil
-                                break
-                            end
-                        end
-                    end
-                end
-
-                wait(1)
-            end
-
-            -- Cambiar a la siguiente plataforma para el próximo ciclo
-            platformIndex = (platformIndex % #PLATFORMS) + 1
-        end
-    end)
-end
