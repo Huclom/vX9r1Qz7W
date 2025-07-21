@@ -842,6 +842,19 @@ local function toggleEventFarm(enabled)
             return (pos1 - pos2).Magnitude <= threshold
         end
 
+        local function waitForRespawn(maxWait)
+            local elapsed = 0
+            while elapsed < maxWait and eventFarmEnabled do
+                wait(1)
+                elapsed += 1
+                local pos = getPosition()
+                if isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD) then
+                    return true
+                end
+            end
+            return false
+        end
+
         local platformIndex = 1
 
         while eventFarmEnabled do
@@ -863,13 +876,12 @@ local function toggleEventFarm(enabled)
             end
 
             if enteredDungeon then
-                -- Esperar hasta reaparecer en la zona común de respawn
-                repeat
-                    wait(1)
-                    local pos = getPosition()
-                until isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD)
-
-                print("[Event Farm] Dungeon finalizada. Cambiando a la siguiente plataforma.")
+                local success = waitForRespawn(60)
+                if success then
+                    print("[Event Farm] Dungeon finalizada. Cambiando a la siguiente plataforma.")
+                else
+                    print("[Event Farm] No se detectó respawn esperado. Continuando de todas formas.")
+                end
             else
                 print("[Event Farm] Plataforma #" .. platformIndex .. " en cooldown. Cambiando...")
             end
@@ -888,7 +900,6 @@ local autoEventFarmSwitch = miscTab.new('switch', {
 autoEventFarmSwitch.event:Connect(function(state)
     toggleEventFarm(state)
 end)
-
 ---------------------------------
 local teleportTab = mainWindow.new({
     text = 'Tps',
