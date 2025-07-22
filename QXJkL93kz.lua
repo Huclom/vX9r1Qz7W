@@ -1,6 +1,6 @@
 local ui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Singularity5490/rbimgui-2/main/rbimgui-2.lua'))()
 local mainWindow = ui.new({
-    text = 'Lo0tify Updated By Huclom',
+    text = 'Lutify Updated By Huclom',
     size = UDim2.new(0, 650, 0, 400)
 })
 mainWindow.open()
@@ -867,17 +867,17 @@ local function toggleEventFarm(enabled)
 
             if enteredDungeon then
                 local success = waitForRespawn(60)
-                if success then
-                    print("[Event Farm] Dungeon finalizada. Cambiando a la siguiente plataforma.")
-                else
-                    print("[Event Farm] No se detectó respawn esperado. Continuando de todas formas.")
-                end
-            else
-                print("[Event Farm] Plataforma #" .. platformIndex .. " en cooldown. Cambiando...")
-            end
-
-            platformIndex = (platformIndex % #PLATFORMS) + 1
-        end
+                    if success then
+                    print("[Event Farm] Dungeon finalizada desde plataforma #" .. platformIndex)
+                        platformIndex = (platformIndex % #PLATFORMS) + 1
+                    else
+                    print("[Event Farm] Dungeon posiblemente incompleta. Reintentando misma plataforma.")
+                    -- No avanzar de plataforma aún
+                    end
+                    else
+                    print("[Event Farm] Plataforma #" .. platformIndex .. " en cooldown. Cambiando...")
+                        platformIndex = (platformIndex % #PLATFORMS) + 1
+end
     end)
 end
 
