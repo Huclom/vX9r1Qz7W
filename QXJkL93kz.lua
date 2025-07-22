@@ -723,54 +723,44 @@ autoSellSwitch.event:Connect(toggleAutoSell)
 local virtualInput = game:GetService("VirtualInputManager")
 local autoSkillEnabled = false
 
--- Definimos las habilidades con sus tiempos de cooldown y animación
+-- Solo H1, H2 y H3
 local skills = {
     {
         name = "H1",
         key = Enum.KeyCode.One,
-        cooldown = 8,
-        animTime = 2,
+        cooldown = 30,
+        postDelay = 2,
         lastUsed = 0
     },
     {
         name = "H2",
         key = Enum.KeyCode.Two,
-        cooldown = 20,
-        animTime = 8,
+        cooldown = 10,
+        postDelay = 2,
         lastUsed = 0
     },
     {
         name = "H3",
         key = Enum.KeyCode.Three,
         cooldown = 15,
-        animTime = 5,
-        lastUsed = 0
-    },
-    {
-        name = "H4",
-        key = Enum.KeyCode.Four,
-        cooldown = 30,
-        animTime = 3,
+        postDelay = 2,
         lastUsed = 0
     }
 }
 
--- Función para presionar una tecla como habilidad
 local function useSkill(skill)
     virtualInput:SendKeyEvent(true, skill.key, false, game)
     wait(0.1)
     virtualInput:SendKeyEvent(false, skill.key, false, game)
     skill.lastUsed = tick()
-    print("✅ Activada " .. skill.name)
+    print("✅ Usando " .. skill.name .. " (Cooldown: " .. skill.cooldown .. "s)")
 end
 
--- Función que activa el sistema de auto skills
 local function toggleAutoSkill(enabled)
     autoSkillEnabled = enabled
 
     if autoSkillEnabled then
         print("Auto Skills habilitado")
-
         spawn(function()
             while autoSkillEnabled do
                 local now = tick()
@@ -778,11 +768,11 @@ local function toggleAutoSkill(enabled)
                 for _, skill in ipairs(skills) do
                     if now - skill.lastUsed >= skill.cooldown then
                         useSkill(skill)
-                        wait(skill.animTime)
+                        wait(skill.postDelay)
                     end
                 end
 
-                wait(0.5) -- Pequeña pausa antes de repetir la secuencia
+                wait(0.5)
             end
         end)
     else
@@ -790,10 +780,10 @@ local function toggleAutoSkill(enabled)
     end
 end
 
--- Switch en tu GUI
+-- UI Switch
 local autoSkillSwitch = miscTab.new('switch', {
     text = 'Auto Skills',
-    tooltip = 'Activa habilidades 1 a 4 en orden, respetando cooldowns y animaciones.'
+    tooltip = 'Activa automáticamente H1, H2 y H3 con cooldowns y delays.'
 })
 autoSkillSwitch.set(false)
 autoSkillSwitch.event:Connect(toggleAutoSkill)
