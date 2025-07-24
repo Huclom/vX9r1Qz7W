@@ -1,6 +1,6 @@
 local ui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Singularity5490/rbimgui-2/main/rbimgui-2.lua'))()
 local mainWindow = ui.new({
-    text = 'Lo0tify Updated By Huclom',
+    text = 'Lutify Updated By Huclom',
     size = UDim2.new(0, 650, 0, 400)
 })
 mainWindow.open()
@@ -852,7 +852,7 @@ local function toggleEventFarm(enabled)
             local initialPos = getPosition()
             local enteredDungeon = false
 
-            -- Espera 17 segundos para detectar entrada
+            -- Espera hasta 17 segundos para detectar entrada
             for i = 1, 17 do
                 wait(1)
                 local currentPos = getPosition()
@@ -864,25 +864,32 @@ local function toggleEventFarm(enabled)
             end
 
             if enteredDungeon then
-                print("[Auto Event] Esperando 65s antes de reiniciar...")
+                print("[Auto Event] Esperando 65s antes de reiniciar personaje...")
                 wait(65)
 
-                -- Reinicia el personaje
                 local char = player.Character or player.CharacterAdded:Wait()
                 char:BreakJoints()
-                print("[Auto Event] Personaje reiniciado.")
+                print("[Auto Event] Personaje reiniciado")
 
-                -- Espera hasta reaparecer
-                local success = waitForRespawn(20)
-                if success then
-                    print("[Auto Event] Reapareciste correctamente.")
+                -- Verifica si reapareció correctamente
+                local respawned = waitForRespawn(20)
+                if respawned then
+                    print("[Auto Event] Reapareciste en el respawn. Cambiando de plataforma...")
                     platformIndex = (platformIndex % #PLATFORMS) + 1
                 else
-                    print("[Auto Event] Falló la detección de respawn.")
+                    print("[Auto Event] No se detectó respawn. Reintentando teleport al respawn.")
+                    teleportTo(RESPAWN_POS)
+                    wait(3)
+                    if isAt(getPosition(), RESPAWN_POS, RESPAWN_THRESHOLD) then
+                        print("[Auto Event] Posición corregida. Continuando ciclo.")
+                        platformIndex = (platformIndex % #PLATFORMS) + 1
+                    else
+                        print("[Auto Event] Aún fuera del respawn. Reintentando misma plataforma.")
+                    end
                 end
             else
-                print("[Auto Event] No se detectó entrada a dungeon. Probando siguiente plataforma...")
-                platformIndex = (platformIndex % #PLATFORMS) + 1
+                print("[Auto Event] No se detectó entrada a dungeon. Reintentando plataforma actual.")
+                -- No se cambia de plataforma, se repite la misma
             end
         end
     end)
@@ -891,7 +898,7 @@ end
 -- 🔘 Switch UI
 local autoEventFarmSwitch = miscTab.new('switch', {
     text = 'Auto Event',
-    tooltip = 'Farmea P5 y P6 reiniciando al final de cada dungeon'
+    tooltip = 'Farmea automáticamente P5 y P6 con reinicio'
 })
 
 autoEventFarmSwitch.event:Connect(function(state)
