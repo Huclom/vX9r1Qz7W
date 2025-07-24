@@ -807,13 +807,10 @@ local function toggleEventFarm(enabled)
         local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
         local RESPAWN_THRESHOLD = 15
 
+        -- Solo P5 y P6
         local PLATFORMS = {
-            Vector3.new(-50.58, -86.11, -11.80),
-            Vector3.new(-78.31, -86.11, -12.76),
-            Vector3.new(-112.42, -86.11, -41.93),
-            Vector3.new(-111.82, -86.11, -69.44),
-            Vector3.new(173.46, -161.01, -15.05),
-            Vector3.new(175.81, -87.51, -213.72),
+            Vector3.new(173.46, -161.01, -15.05),   -- P5
+            Vector3.new(175.81, -87.51, -213.72),   -- P6
         }
 
         local function teleportTo(pos)
@@ -849,50 +846,58 @@ local function toggleEventFarm(enabled)
 
         while eventFarmEnabled do
             local currentPlatform = PLATFORMS[platformIndex]
-            print("[Event Farm] Teletransportando a plataforma #" .. platformIndex)
+            print("[Auto Event] Teletransportando a plataforma #" .. platformIndex)
             teleportTo(currentPlatform)
 
             local initialPos = getPosition()
             local enteredDungeon = false
 
-            -- Espera hasta 17 segundos para ver si el jugador entra a una dungeon
+            -- Espera 17 segundos para detectar entrada
             for i = 1, 17 do
                 wait(1)
                 local currentPos = getPosition()
                 if (currentPos - initialPos).Magnitude > 10 then
-                    print("[Event Farm] Entraste a la dungeon desde plataforma #" .. platformIndex)
+                    print("[Auto Event] Entraste a la dungeon desde plataforma #" .. platformIndex)
                     enteredDungeon = true
                     break
                 end
             end
 
             if enteredDungeon then
-                local success = waitForRespawn(60)
+                print("[Auto Event] Esperando 65s antes de reiniciar...")
+                wait(65)
+
+                -- Reinicia el personaje
+                local char = player.Character or player.CharacterAdded:Wait()
+                char:BreakJoints()
+                print("[Auto Event] Personaje reiniciado.")
+
+                -- Espera hasta reaparecer
+                local success = waitForRespawn(20)
                 if success then
-                    print("[Event Farm] Dungeon finalizada desde plataforma #" .. platformIndex)
+                    print("[Auto Event] Reapareciste correctamente.")
                     platformIndex = (platformIndex % #PLATFORMS) + 1
                 else
-                    print("[Event Farm] Dungeon posiblemente incompleta. Reintentando misma plataforma.")
-                    -- No avanzar de plataforma aún
+                    print("[Auto Event] Falló la detección de respawn.")
                 end
             else
-                print("[Event Farm] Plataforma #" .. platformIndex .. " en cooldown. Cambiando...")
+                print("[Auto Event] No se detectó entrada a dungeon. Probando siguiente plataforma...")
                 platformIndex = (platformIndex % #PLATFORMS) + 1
             end
         end
     end)
 end
 
-
 -- 🔘 Switch UI
 local autoEventFarmSwitch = miscTab.new('switch', {
     text = 'Auto Event',
-    tooltip = 'Empieza a farmear el evento'
+    tooltip = 'Farmea P5 y P6 reiniciando al final de cada dungeon'
 })
 
 autoEventFarmSwitch.event:Connect(function(state)
     toggleEventFarm(state)
 end)
+
 ---------------------------------
 local teleportTab = mainWindow.new({
     text = 'Tps',
