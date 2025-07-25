@@ -804,8 +804,6 @@ local function toggleEventFarm(enabled)
 
     spawn(function()
         local player = game.Players.LocalPlayer
-        local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
-        local RESPAWN_THRESHOLD = 15
         local P5_POS = Vector3.new(173.46, -161.01, -15.05)
 
         local function teleportTo(pos)
@@ -820,60 +818,36 @@ local function toggleEventFarm(enabled)
             return hrp.Position
         end
 
-        local function isAt(pos1, pos2, threshold)
-            return (pos1 - pos2).Magnitude <= threshold
-        end
-
-        local function waitForRespawn(maxWait)
-            local elapsed = 0
-            while elapsed < maxWait and eventFarmEnabled do
-                wait(1)
-                elapsed += 1
-                local pos = getPosition()
-                if isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD) then
-                    return true
-                end
-            end
-            return false
-        end
-
         while eventFarmEnabled do
             print("[Auto Event] Teletransportando a P5...")
             teleportTo(P5_POS)
+            wait(1)
 
             local initialPos = getPosition()
             local enteredDungeon = false
 
-            -- Espera hasta 17 segundos para detectar entrada
+            -- Esperar hasta 17s para ver si entra
             for i = 1, 17 do
                 wait(1)
                 local currentPos = getPosition()
                 if (currentPos - initialPos).Magnitude > 10 then
-                    print("[Auto Event] Entraste a la dungeon P5.")
+                    print("[Auto Event] Entraste a la dungeon.")
                     enteredDungeon = true
                     break
                 end
             end
 
             if enteredDungeon then
-                print("[Auto Event] Esperando 65s para completar la dungeon...")
+                print("[Auto Event] Esperando 65s para terminar la dungeon...")
                 wait(65)
 
                 local char = player.Character or player.CharacterAdded:Wait()
                 char:BreakJoints()
-                print("[Auto Event] Personaje reiniciado")
+                print("[Auto Event] Reinicio realizado.")
 
-                -- Espera reaparecer en respawn
-                local success = waitForRespawn(20)
-                if success then
-                    print("[Auto Event] Reapareciste correctamente. Repitiendo P5...")
-                else
-                    print("[Auto Event] Reintento: Teleportando al respawn...")
-                    teleportTo(RESPAWN_POS)
-                    wait(3)
-                end
+                wait(3) -- Espera para asegurar respawn
             else
-                print("[Auto Event] No se entró a la dungeon. Reintentando P5...")
+                print("[Auto Event] No se detectó entrada. Reintentando...")
                 wait(3)
             end
         end
@@ -883,7 +857,7 @@ end
 -- 🔘 Switch UI
 local autoEventFarmSwitch = miscTab.new('switch', {
     text = 'Auto Event P5 Only',
-    tooltip = 'Farmea infinitamente la dungeon de Kibutsuji Muzan (P5) con reinicio'
+    tooltip = 'Farmea infinitamente la dungeon de Kibutsuji Muzan (P5) con reinicio.'
 })
 
 autoEventFarmSwitch.event:Connect(function(state)
