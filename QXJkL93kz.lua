@@ -1,6 +1,6 @@
 local ui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Singularity5490/rbimgui-2/main/rbimgui-2.lua'))()
 local mainWindow = ui.new({
-    text = 'Lutify Updated By Huclom',
+    text = 'Lo0tify Updated By Huclom',
     size = UDim2.new(0, 650, 0, 400)
 })
 mainWindow.open()
@@ -806,12 +806,7 @@ local function toggleEventFarm(enabled)
         local player = game.Players.LocalPlayer
         local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
         local RESPAWN_THRESHOLD = 15
-
-        -- Solo P5 y P6
-        local PLATFORMS = {
-            Vector3.new(173.46, -161.01, -15.05),   -- P5
-            Vector3.new(175.81, -87.51, -213.72),   -- P6
-        }
+        local P5_POS = Vector3.new(173.46, -161.01, -15.05)
 
         local function teleportTo(pos)
             local char = player.Character or player.CharacterAdded:Wait()
@@ -842,12 +837,9 @@ local function toggleEventFarm(enabled)
             return false
         end
 
-        local platformIndex = 1
-
         while eventFarmEnabled do
-            local currentPlatform = PLATFORMS[platformIndex]
-            print("[Auto Event] Teletransportando a plataforma #" .. platformIndex)
-            teleportTo(currentPlatform)
+            print("[Auto Event] Teletransportando a P5...")
+            teleportTo(P5_POS)
 
             local initialPos = getPosition()
             local enteredDungeon = false
@@ -857,39 +849,32 @@ local function toggleEventFarm(enabled)
                 wait(1)
                 local currentPos = getPosition()
                 if (currentPos - initialPos).Magnitude > 10 then
-                    print("[Auto Event] Entraste a la dungeon desde plataforma #" .. platformIndex)
+                    print("[Auto Event] Entraste a la dungeon P5.")
                     enteredDungeon = true
                     break
                 end
             end
 
             if enteredDungeon then
-                print("[Auto Event] Esperando 65s antes de reiniciar personaje...")
+                print("[Auto Event] Esperando 65s para completar la dungeon...")
                 wait(65)
 
                 local char = player.Character or player.CharacterAdded:Wait()
                 char:BreakJoints()
                 print("[Auto Event] Personaje reiniciado")
 
-                -- Verifica si reapareció correctamente
-                local respawned = waitForRespawn(20)
-                if respawned then
-                    print("[Auto Event] Reapareciste en el respawn. Cambiando de plataforma...")
-                    platformIndex = (platformIndex % #PLATFORMS) + 1
+                -- Espera reaparecer en respawn
+                local success = waitForRespawn(20)
+                if success then
+                    print("[Auto Event] Reapareciste correctamente. Repitiendo P5...")
                 else
-                    print("[Auto Event] No se detectó respawn. Reintentando teleport al respawn.")
+                    print("[Auto Event] Reintento: Teleportando al respawn...")
                     teleportTo(RESPAWN_POS)
                     wait(3)
-                    if isAt(getPosition(), RESPAWN_POS, RESPAWN_THRESHOLD) then
-                        print("[Auto Event] Posición corregida. Continuando ciclo.")
-                        platformIndex = (platformIndex % #PLATFORMS) + 1
-                    else
-                        print("[Auto Event] Aún fuera del respawn. Reintentando misma plataforma.")
-                    end
                 end
             else
-                print("[Auto Event] No se detectó entrada a dungeon. Reintentando plataforma actual.")
-                -- No se cambia de plataforma, se repite la misma
+                print("[Auto Event] No se entró a la dungeon. Reintentando P5...")
+                wait(3)
             end
         end
     end)
@@ -897,8 +882,8 @@ end
 
 -- 🔘 Switch UI
 local autoEventFarmSwitch = miscTab.new('switch', {
-    text = 'Auto Event',
-    tooltip = 'Farmea automáticamente P5 y P6 con reinicio'
+    text = 'Auto Event P5 Only',
+    tooltip = 'Farmea infinitamente la dungeon de Kibutsuji Muzan (P5) con reinicio'
 })
 
 autoEventFarmSwitch.event:Connect(function(state)
