@@ -1,6 +1,6 @@
 local ui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Singularity5490/rbimgui-2/main/rbimgui-2.lua'))()
 local mainWindow = ui.new({
-    text = 'Lo0tify Updated By Huclom',
+    text = 'Lutify Updated By Huclom',
     size = UDim2.new(0, 650, 0, 400)
 })
 mainWindow.open()
