@@ -804,8 +804,8 @@ local function toggleEventFarm(enabled)
 
     spawn(function()
         local player = game.Players.LocalPlayer
-        local P5_POS = Vector3.new(173.46, -161.01, -15.05)
-        local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
+        local P5_POS = Vector3.new(173.45, -161.01, -15.31)
+        local RESPAWN_POS = Vector3.new(-63.70, -86.77, -57.76)
         local RESPAWN_THRESHOLD = 15
 
         local function teleportTo(pos)
@@ -820,6 +820,10 @@ local function toggleEventFarm(enabled)
             return hrp.Position
         end
 
+        local function isAt(pos1, pos2, threshold)
+            return (pos1 - pos2).Magnitude <= threshold
+        end
+
         while eventFarmEnabled do
             print("[Auto Event] Teletransportando a P5...")
             teleportTo(P5_POS)
@@ -828,46 +832,40 @@ local function toggleEventFarm(enabled)
             local initialPos = getPosition()
             local enteredDungeon = false
 
-            -- Espera hasta 17 segundos para detectar entrada a dungeon
+            -- Espera hasta detectar entrada a la dungeon
             for i = 1, 17 do
                 wait(1)
                 local currentPos = getPosition()
-                if (currentPos - initialPos).Magnitude > 10 then
-                    print("[Auto Event] Entraste a la dungeon.")
+                if (currentPos - initialPos).Magnitude > 15 then
+                    print("[✅ Auto Event] Ingreso a la dungeon.")
                     enteredDungeon = true
                     break
                 end
             end
 
             if enteredDungeon then
-                print("[Auto Event] Esperando hasta 65s o respawn...")
+                print("[⌛ Auto Event] Esperando 65 segundos en dungeon...")
+                wait(65)
 
-                local elapsed = 0
-                local respawnedEarly = false
-
-                while elapsed < 65 and eventFarmEnabled do
-                    wait(1)
-                    elapsed += 1
-                    local pos = getPosition()
-                    if (pos - RESPAWN_POS).Magnitude <= RESPAWN_THRESHOLD then
-                        print("[⚠️ Auto Event] Reapareciste antes de tiempo. Dungeon completada.")
-                        respawnedEarly = true
-                        break
-                    end
-                end
-
-                if not respawnedEarly then
-                    print("[Auto Event] Reiniciando personaje...")
-                    local char = player.Character or player.CharacterAdded:Wait()
-                    char:BreakJoints()
-                    wait(3)
-                else
-                    print("[Auto Event] Cooldown activo. Esperando para reintentar...")
-                    wait(10)
-                end
-            else
-                print("[Auto Event] No se detectó entrada. Reintentando...")
+                print("[💀 Auto Event] Reiniciando personaje...")
+                local char = player.Character or player.CharacterAdded:Wait()
+                char:BreakJoints()
                 wait(3)
+
+                -- Verificar si está en el respawn
+                local pos = getPosition()
+                local waitCounter = 0
+                while not isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD) and waitCounter < 20 and eventFarmEnabled do
+                    wait(1)
+                    pos = getPosition()
+                    waitCounter += 1
+                    print("[🕒 Esperando respawn] Verificando ubicación... (" .. waitCounter .. "s)")
+                end
+
+                print("[🚀 Auto Event] Volviendo a P5...")
+            else
+                print("[⚠️ Auto Event] No se detectó entrada. Reintentando...")
+                wait(2)
             end
         end
     end)
@@ -876,12 +874,13 @@ end
 -- 🔘 Switch UI
 local autoEventFarmSwitch = miscTab.new('switch', {
     text = 'Auto Event P5 Only',
-    tooltip = 'Farmea infinitamente la dungeon de Kibutsuji Muzan (P5) con reinicio.'
+    tooltip = 'Farm automático solo en P5 con reinicio y detección de dungeon.'
 })
 
 autoEventFarmSwitch.event:Connect(function(state)
     toggleEventFarm(state)
 end)
+
 
 ---------------------------------
 local teleportTab = mainWindow.new({
