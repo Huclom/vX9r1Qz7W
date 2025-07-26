@@ -83,23 +83,23 @@ local dungeonList = {
         id = 101017
     },
     {
-        name = '03. Starter',
+        name = '07. Starter',
         id = 101055
     },
     {
-        name = '03. Medium',
+        name = '07. Medium',
         id = 101056
     },
     {
-        name = '03. Hard',
+        name = '07. Hard',
         id = 101057
     },
     {
-        name = '03. Extreme',
+        name = '07. Extreme',
         id = 101058
     },
     {
-        name = '03. Final Boss',
+        name = '07. Final Boss',
         id = 101059
     }
 }
