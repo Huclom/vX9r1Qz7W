@@ -805,6 +805,8 @@ local function toggleEventFarm(enabled)
     spawn(function()
         local player = game.Players.LocalPlayer
         local P5_POS = Vector3.new(173.46, -161.01, -15.05)
+        local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
+        local RESPAWN_THRESHOLD = 15
 
         local function teleportTo(pos)
             local char = player.Character or player.CharacterAdded:Wait()
@@ -826,7 +828,7 @@ local function toggleEventFarm(enabled)
             local initialPos = getPosition()
             local enteredDungeon = false
 
-            -- Esperar hasta 17s para ver si entra
+            -- Espera hasta 17 segundos para detectar entrada a dungeon
             for i = 1, 17 do
                 wait(1)
                 local currentPos = getPosition()
@@ -838,14 +840,31 @@ local function toggleEventFarm(enabled)
             end
 
             if enteredDungeon then
-                print("[Auto Event] Esperando 65s para terminar la dungeon...")
-                wait(65)
+                print("[Auto Event] Esperando hasta 65s o respawn...")
 
-                local char = player.Character or player.CharacterAdded:Wait()
-                char:BreakJoints()
-                print("[Auto Event] Reinicio realizado.")
+                local elapsed = 0
+                local respawnedEarly = false
 
-                wait(3) -- Espera para asegurar respawn
+                while elapsed < 65 and eventFarmEnabled do
+                    wait(1)
+                    elapsed += 1
+                    local pos = getPosition()
+                    if (pos - RESPAWN_POS).Magnitude <= RESPAWN_THRESHOLD then
+                        print("[⚠️ Auto Event] Reapareciste antes de tiempo. Dungeon completada.")
+                        respawnedEarly = true
+                        break
+                    end
+                end
+
+                if not respawnedEarly then
+                    print("[Auto Event] Reiniciando personaje...")
+                    local char = player.Character or player.CharacterAdded:Wait()
+                    char:BreakJoints()
+                    wait(3)
+                else
+                    print("[Auto Event] Cooldown activo. Esperando para reintentar...")
+                    wait(10)
+                end
             else
                 print("[Auto Event] No se detectó entrada. Reintentando...")
                 wait(3)
