@@ -1067,4 +1067,3 @@ infoTab.new('label', {
     text = 'Please have your DMs turned on for non-friends as I do not want to flood my own friend list.',
     color = Color3.new(1, 0, 0)
 })
-
