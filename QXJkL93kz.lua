@@ -81,6 +81,26 @@ local dungeonList = {
     {
         name = '03. Final Boss',
         id = 101017
+    },
+    {
+        name = '03. Starter',
+        id = 101055
+    },
+    {
+        name = '03. Medium',
+        id = 101056
+    },
+    {
+        name = '03. Hard',
+        id = 101057
+    },
+    {
+        name = '03. Extreme',
+        id = 101058
+    },
+    {
+        name = '03. Final Boss',
+        id = 101059
     }
 }
 
@@ -149,7 +169,12 @@ local dungeonPositions = {
     [101014] = Vector3.new(1378.2399999999998, -129.25, 2808.32),
     [101015] = Vector3.new(2014.44, -131.98, 2759.540000000001),
     [101016] = Vector3.new(1366.6400000000003, -127.01, 2824.76),
-    [101017] = Vector3.new(1992.17, -65.05, 2805.37)
+    [101017] = Vector3.new(1992.17, -65.05, 2805.37),
+    [101055] = Vector3.new(-1683.49, 60.85, 671.78),
+    [101056] = Vector3.new(-1705.27, 60.94, 607.78),
+    [101057] = Vector3.new(-1677.46, 66.76, 847.17),
+    [101058] = Vector3.new(-1785.29, 84.46, 781.22),
+    [101059] = Vector3.new(-1834.46, 83.05, 809.69)
 }
 
 local function teleportToDungeon(dungeonId)
