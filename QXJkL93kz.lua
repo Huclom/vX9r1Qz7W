@@ -81,6 +81,86 @@ local dungeonList = {
     {
         name = '03. Final Boss',
         id = 101017
+    },
+    {
+        name = '04. Starter',
+        id = 101025
+    },
+    {
+        name = '04. Medium',
+        id = 101026
+    },
+    {
+        name = '04. Hard',
+        id = 101027
+    },
+    {
+        name = '04. Extreme',
+        id = 101028
+    },
+    {
+        name = '04. Final Boss',
+        id = 101029
+    },
+    {
+        name = '05. Starter',
+        id = 101035
+    },
+    {
+        name = '05. Medium',
+        id = 101036
+    },
+    {
+        name = '05. Hard',
+        id = 101037
+    },
+    {
+        name = '05. Extreme',
+        id = 101038
+    },
+    {
+        name = '05. Final Boss',
+        id = 101039
+    },
+    {
+        name = '06. Starter',
+        id = 101045
+    },
+    {
+        name = '06. Medium',
+        id = 101046
+    },
+    {
+        name = '06. Hard',
+        id = 101047
+    },
+    {
+        name = '06. Extreme',
+        id = 101048
+    },
+    {
+        name = '06. Final Boss',
+        id = 
+    },
+    {
+        name = '07. Starter',
+        id = 101055
+    },
+    {
+        name = '07. Medium',
+        id = 101056
+    },
+    {
+        name = '07. Hard',
+        id = 101057
+    },
+    {
+        name = '07. Extreme',
+        id = 101058
+    },
+    {
+        name = '07. Final Boss',
+        id = 101059
     }
 }
 
@@ -149,7 +229,27 @@ local dungeonPositions = {
     [101014] = Vector3.new(1378.2399999999998, -129.25, 2808.32),
     [101015] = Vector3.new(2014.44, -131.98, 2759.540000000001),
     [101016] = Vector3.new(1366.6400000000003, -127.01, 2824.76),
-    [101017] = Vector3.new(1992.17, -65.05, 2805.37)
+    [101017] = Vector3.new(1992.17, -65.05, 2805.37),
+    [101025] = Vector3.new(3655.67, 56.26, 1261.62),
+    [101026] = Vector3.new(3751.95, 56.78, 1254.43),
+    [101027] = Vector3.new(3788.69, 58.47, 1169.73),
+    [101028] = Vector3.new(3927.13, 58.92, 1139.26),
+    [101025] = Vector3.new(4040.52, 66.84, 1152.36),
+    [101035] = Vector3.new(1457.63, 644.01, 904.20),
+    [101036] = Vector3.new(954.31, 644.01, 1406.91),
+    [101037] = Vector3.new(2040.73, 719.53, 1062.86),
+    [101038] = Vector3.new(1386.20, 745.53, 2174.16),
+    [101039] = Vector3.new(1842.84, 925.12, 1791.41),
+    [101045] = Vector3.new(3262.34, 161.41, -1192.69),
+    [101046] = Vector3.new(3544.91, 231.23, -1433.69),
+    [101047] = Vector3.new(3161.33, 235.56, -1564.94),
+    [101048] = Vector3.new(3369.70, 204.58, -1522.44),
+    [101049] = Vector3.new(3465.99, 204.52, -1820.18),
+    [101055] = Vector3.new(-1683.49, 60.85, 671.78),
+    [101056] = Vector3.new(-1705.27, 60.94, 607.78),
+    [101057] = Vector3.new(-1677.46, 66.76, 847.17),
+    [101058] = Vector3.new(-1785.29, 84.46, 781.22),
+    [101059] = Vector3.new(-1834.46, 83.05, 809.69)
 }
 
 local function teleportToDungeon(dungeonId)
@@ -804,8 +904,8 @@ local function toggleEventFarm(enabled)
 
     spawn(function()
         local player = game.Players.LocalPlayer
-        local P5_POS = Vector3.new(173.45, -161.01, -15.31)
-        local RESPAWN_POS = Vector3.new(-63.70, -86.77, -57.76)
+        local P5_POS = Vector3.new(173.46, -161.01, -15.05)
+        local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
         local RESPAWN_THRESHOLD = 15
 
         local function teleportTo(pos)
@@ -820,10 +920,6 @@ local function toggleEventFarm(enabled)
             return hrp.Position
         end
 
-        local function isAt(pos1, pos2, threshold)
-            return (pos1 - pos2).Magnitude <= threshold
-        end
-
         while eventFarmEnabled do
             print("[Auto Event] Teletransportando a P5...")
             teleportTo(P5_POS)
@@ -832,40 +928,46 @@ local function toggleEventFarm(enabled)
             local initialPos = getPosition()
             local enteredDungeon = false
 
-            -- Espera hasta detectar entrada a la dungeon
+            -- Espera hasta 17 segundos para detectar entrada a dungeon
             for i = 1, 17 do
                 wait(1)
                 local currentPos = getPosition()
-                if (currentPos - initialPos).Magnitude > 15 then
-                    print("[✅ Auto Event] Ingreso a la dungeon.")
+                if (currentPos - initialPos).Magnitude > 10 then
+                    print("[Auto Event] Entraste a la dungeon.")
                     enteredDungeon = true
                     break
                 end
             end
 
             if enteredDungeon then
-                print("[⌛ Auto Event] Esperando 65 segundos en dungeon...")
-                wait(65)
+                print("[Auto Event] Esperando hasta 65s o respawn...")
 
-                print("[💀 Auto Event] Reiniciando personaje...")
-                local char = player.Character or player.CharacterAdded:Wait()
-                char:BreakJoints()
-                wait(3)
+                local elapsed = 0
+                local respawnedEarly = false
 
-                -- Verificar si está en el respawn
-                local pos = getPosition()
-                local waitCounter = 0
-                while not isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD) and waitCounter < 20 and eventFarmEnabled do
+                while elapsed < 65 and eventFarmEnabled do
                     wait(1)
-                    pos = getPosition()
-                    waitCounter += 1
-                    print("[🕒 Esperando respawn] Verificando ubicación... (" .. waitCounter .. "s)")
+                    elapsed += 1
+                    local pos = getPosition()
+                    if (pos - RESPAWN_POS).Magnitude <= RESPAWN_THRESHOLD then
+                        print("[⚠️ Auto Event] Reapareciste antes de tiempo. Dungeon completada.")
+                        respawnedEarly = true
+                        break
+                    end
                 end
 
-                print("[🚀 Auto Event] Volviendo a P5...")
+                if not respawnedEarly then
+                    print("[Auto Event] Reiniciando personaje...")
+                    local char = player.Character or player.CharacterAdded:Wait()
+                    char:BreakJoints()
+                    wait(3)
+                else
+                    print("[Auto Event] Cooldown activo. Esperando para reintentar...")
+                    wait(10)
+                end
             else
-                print("[⚠️ Auto Event] No se detectó entrada. Reintentando...")
-                wait(2)
+                print("[Auto Event] No se detectó entrada. Reintentando...")
+                wait(3)
             end
         end
     end)
@@ -874,13 +976,12 @@ end
 -- 🔘 Switch UI
 local autoEventFarmSwitch = miscTab.new('switch', {
     text = 'Auto Event P5 Only',
-    tooltip = 'Farm automático solo en P5 con reinicio y detección de dungeon.'
+    tooltip = 'Farmea infinitamente la dungeon de Kibutsuji Muzan (P5) con reinicio.'
 })
 
 autoEventFarmSwitch.event:Connect(function(state)
     toggleEventFarm(state)
 end)
-
 
 ---------------------------------
 local teleportTab = mainWindow.new({
@@ -920,6 +1021,27 @@ local island3Button = teleportTab.new('button', {
 })
 island3Button.event:Connect(function()
     teleportTo(Vector3.new(1731.0500000000002, 53.58, 2833.26))
+end)
+
+local island4Button = teleportTab.new('button', {
+    text = 'Teleport to Island 4'
+})
+island4Button.event:Connect(function()
+    teleportTo(Vector3.new(3561.03, 58.73, 1739.64))
+end)
+
+local island5Button = teleportTab.new('button', {
+    text = 'Teleport to Island 5'
+})
+island5Button.event:Connect(function()
+    teleportTo(Vector3.new(1339.02, 701.68, 1203.47))
+end)
+
+local island6Button = teleportTab.new('button', {
+    text = 'Teleport to Island 6'
+})
+island6Button.event:Connect(function()
+    teleportTo(Vector3.new(3068.84, 53.87, -679.50))
 end)
 
 local infoTab = mainWindow.new({
