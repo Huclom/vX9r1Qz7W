@@ -905,53 +905,6 @@ local autoEventFarmSwitch = miscTab.new('switch', {
 autoEventFarmSwitch.event:Connect(function(state)
     toggleEventFarm(state)
 end)
----------------------------------
-local autoKillSimpleEnabled = false
-
-local function toggleAutoKillSimple(enabled)
-    autoKillSimpleEnabled = enabled
-    local player = game.Players.LocalPlayer
-
-    if autoKillSimpleEnabled then
-        print('[AutoKill Simple] Activado')
-        spawn(function()
-            while autoKillSimpleEnabled do
-                pcall(function()
-                    local character = player.Character or player.CharacterAdded:Wait()
-                    local humanoid = character:FindFirstChild('Humanoid')
-                    local humanoidRootPart = character:FindFirstChild('HumanoidRootPart')
-                    if not humanoid or not humanoidRootPart then return end
-                    if humanoid.Health <= 0 then return end
-
-                    local tool = character:FindFirstChildOfClass('Tool') or player.Backpack:FindFirstChildOfClass('Tool')
-                    if not tool then return end
-                    if tool.Parent ~= character then
-                        tool.Parent = character
-                        wait(0.2)
-                    end
-
-                    local target = findClosestEnemy()
-                    if target then
-                        humanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
-                        tool:Activate()
-                    end
-                end)
-                wait(0.2)
-            end
-        end)
-    else
-        print('[AutoKill Simple] Desactivado')
-    end
-end
-
--- 🔘 Switch para Auto Kill Simple
-local autoKillSimpleSwitch = combatTab.new('switch', {
-    text = 'Auto Kill (Simple)',
-    tooltip = 'Teletransporta y ataca enemigos cercanos sin cambiar dungeon.'
-})
-autoKillSimpleSwitch.event:Connect(toggleAutoKillSimple)
-
-
 ------------------------------------------------------------------------------------------------------
 local teleportTab = mainWindow.new({
     text = 'Tps',
