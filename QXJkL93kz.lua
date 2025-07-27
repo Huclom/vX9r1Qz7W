@@ -905,49 +905,17 @@ local autoEventFarmSwitch = miscTab.new('switch', {
 autoEventFarmSwitch.event:Connect(function(state)
     toggleEventFarm(state)
 end)
-
-
 ---------------------------------
-local autoKillEnabled = false
-local tweenService = game:GetService('TweenService')
+local autoKillSimpleEnabled = false
 
--- 🔍 Encuentra al enemigo más cercano
-local function findClosestEnemy()
-    local closestDistance, closestEnemy = math.huge, nil
-    local playerRoot = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild('HumanoidRootPart')
-
-    if not playerRoot then return nil end
-
-    local enemyFolder = workspace:FindFirstChild('EnemyFolder')
-    if not enemyFolder then return nil end
-
-    for _, enemy in pairs(enemyFolder:GetChildren()) do
-        if enemy:IsA('Model') and enemy:FindFirstChild('HumanoidRootPart') and enemy:FindFirstChild('Humanoid') and enemy.Humanoid.Health > 0 then
-            local distance = (enemy.HumanoidRootPart.Position - playerRoot.Position).Magnitude
-            if distance < closestDistance then
-                closestDistance = distance
-                closestEnemy = enemy
-            end
-        end
-    end
-
-    return closestEnemy
-end
-
--- 🚀 Teletransporta al jugador cerca del enemigo
-local function teleportToTarget(playerRoot, target)
-    playerRoot.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
-end
-
--- ⚔️ Loop de auto ataque
-local function toggleAutoKill(enabled)
-    autoKillEnabled = enabled
+local function toggleAutoKillSimple(enabled)
+    autoKillSimpleEnabled = enabled
     local player = game.Players.LocalPlayer
 
-    if autoKillEnabled then
-        print('[AutoKill] Activado')
+    if autoKillSimpleEnabled then
+        print('[AutoKill Simple] Activado')
         spawn(function()
-            while autoKillEnabled do
+            while autoKillSimpleEnabled do
                 pcall(function()
                     local character = player.Character or player.CharacterAdded:Wait()
                     local humanoid = character:FindFirstChild('Humanoid')
@@ -956,11 +924,7 @@ local function toggleAutoKill(enabled)
                     if humanoid.Health <= 0 then return end
 
                     local tool = character:FindFirstChildOfClass('Tool') or player.Backpack:FindFirstChildOfClass('Tool')
-                    if not tool then
-                        warn('[AutoKill] No se encontró herramienta')
-                        return
-                    end
-
+                    if not tool then return end
                     if tool.Parent ~= character then
                         tool.Parent = character
                         wait(0.2)
@@ -968,7 +932,7 @@ local function toggleAutoKill(enabled)
 
                     local target = findClosestEnemy()
                     if target then
-                        teleportToTarget(humanoidRootPart, target)
+                        humanoidRootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
                         tool:Activate()
                     end
                 end)
@@ -976,19 +940,17 @@ local function toggleAutoKill(enabled)
             end
         end)
     else
-        print('[AutoKill] Desactivado')
+        print('[AutoKill Simple] Desactivado')
     end
 end
 
--- 🔘 UI Switch (ajústalo según tu sistema)
-local autoKillSwitch = combatTab.new('switch', {
-    text = 'Auto Kill',
-    tooltip = 'Se teletransporta a enemigos cercanos y los ataca automáticamente.'
+-- 🔘 Switch para Auto Kill Simple
+local autoKillSimpleSwitch = combatTab.new('switch', {
+    text = 'Auto Kill (Simple)',
+    tooltip = 'Teletransporta y ataca enemigos cercanos sin cambiar dungeon.'
 })
+autoKillSimpleSwitch.event:Connect(toggleAutoKillSimple)
 
-autoKillSwitch.event:Connect(function(state)
-    toggleAutoKill(state)
-end)
 
 ------------------------------------------------------------------------------------------------------
 local teleportTab = mainWindow.new({
