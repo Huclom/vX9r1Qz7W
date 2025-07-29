@@ -837,9 +837,13 @@ local function toggleEventFarm(enabled)
 
     spawn(function()
         local player = game.Players.LocalPlayer
-        local P5_POS = Vector3.new(173.45, -161.01, -15.31)
-        local RESPAWN_POS = Vector3.new(-63.70, -86.77, -57.76)
+        local RESPAWN_POS = Vector3.new(-62.76, -86.77, -56.66)
         local RESPAWN_THRESHOLD = 15
+
+        -- Solo P5
+        local PLATFORMS = {
+            Vector3.new(173.46, -161.01, -15.05),   -- P5
+        }
 
         local function teleportTo(pos)
             local char = player.Character or player.CharacterAdded:Wait()
@@ -857,48 +861,60 @@ local function toggleEventFarm(enabled)
             return (pos1 - pos2).Magnitude <= threshold
         end
 
+        local function waitForRespawn(maxWait)
+            local elapsed = 0
+            while elapsed < maxWait and eventFarmEnabled do
+                wait(1)
+                elapsed += 1
+                local pos = getPosition()
+                if isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD) then
+                    return true
+                end
+            end
+            return false
+        end
+
+        local platformIndex = 1
+
         while eventFarmEnabled do
-            print("[Auto Event] Teletransportando a P5...")
-            teleportTo(P5_POS)
-            wait(1)
+            local currentPlatform = PLATFORMS[platformIndex]
+            print("[Auto Event] Teletransportando a P5")
+            teleportTo(currentPlatform)
 
             local initialPos = getPosition()
             local enteredDungeon = false
 
-            -- Espera hasta detectar entrada a la dungeon
+            -- Espera 17 segundos para detectar entrada
             for i = 1, 17 do
                 wait(1)
                 local currentPos = getPosition()
-                if (currentPos - initialPos).Magnitude > 15 then
-                    print("[✅ Auto Event] Ingreso a la dungeon.")
+                if (currentPos - initialPos).Magnitude > 10 then
+                    print("[Auto Event] Entraste a la dungeon.")
                     enteredDungeon = true
                     break
                 end
             end
 
             if enteredDungeon then
-                print("[⌛ Auto Event] Esperando 65 segundos en dungeon...")
+                print("[Auto Event] Esperando 65s antes de reiniciar...")
                 wait(65)
 
-                print("[💀 Auto Event] Reiniciando personaje...")
+                -- Reinicia el personaje
                 local char = player.Character or player.CharacterAdded:Wait()
                 char:BreakJoints()
-                wait(3)
+                print("[Auto Event] Personaje reiniciado.")
 
-                -- Verificar si está en el respawn
-                local pos = getPosition()
-                local waitCounter = 0
-                while not isAt(pos, RESPAWN_POS, RESPAWN_THRESHOLD) and waitCounter < 20 and eventFarmEnabled do
-                    wait(1)
-                    pos = getPosition()
-                    waitCounter += 1
-                    print("[🕒 Esperando respawn] Verificando ubicación... (" .. waitCounter .. "s)")
+                -- Espera hasta reaparecer
+                local success = waitForRespawn(20)
+                if success then
+                    print("[Auto Event] Reapareciste correctamente.")
+                    platformIndex = 1  -- Solo P5
+                else
+                    print("[Auto Event] Falló la detección de respawn.")
                 end
-
-                print("[🚀 Auto Event] Volviendo a P5...")
             else
-                print("[⚠️ Auto Event] No se detectó entrada. Reintentando...")
-                wait(2)
+                print("[Auto Event] No se detectó entrada a dungeon. Reintentando P5...")
+                platformIndex = 1  -- Solo P5
             end
         end
     end)
@@ -906,8 +922,8 @@ end
 
 -- 🔘 Switch UI
 local autoEventFarmSwitch = miscTab.new('switch', {
-    text = 'Auto Event P5 Only',
-    tooltip = 'Farm automático solo en P5 con reinicio y detección de dungeon.'
+    text = 'Auto Event P5',
+    tooltip = 'Farmea solo en P5 reiniciando al final de cada dungeon'
 })
 
 autoEventFarmSwitch.event:Connect(function(state)
