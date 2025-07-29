@@ -1,4 +1,12 @@
-local ui = loadstring(game:HttpGet('https://raw.githubusercontent.com/Singularity5490/rbimgui-2/main/rbimgui-2.lua'))()
+local success, ui = pcall(function()
+    return loadstring(game:HttpGet('https://raw.githubusercontent.com/Huclom/seinINDSF/main/archivoos.lua'))()
+end)
+
+if not success then
+    warn("❌ Error cargando interfaz UI:", ui)
+    return
+end
+
 local mainWindow = ui.new({
     text = 'Lo0tify Updated By Huclom',
     size = UDim2.new(0, 650, 0, 400)
