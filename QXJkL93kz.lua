@@ -56,7 +56,7 @@ end
 local Window = Rayfield:CreateWindow({
     Name = "ESP de Vehículos (Selectivo)",
     LoadingTitle = "Cargando Script",
-    LoadingSubtitle = "by Res",
+    LoadingSubtitle = "by Resadsadasd",
     ConfigurationSaving = { Enabled = false }, 
     KeySystem = false,
 })
@@ -200,3 +200,4 @@ local function ScanForVehicles()
 end
 
 RunService.Stepped:Connect(ScanForVehicles)
+
