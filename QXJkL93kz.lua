@@ -10,7 +10,6 @@ local RunService = game:GetService("RunService")
 -- ===============================================
 
 -- 🚨 LISTA DE LOS NOMBRES DE AUTOS QUE QUIERES EN EL MENÚ
--- (Estos son los valores del Atributo "Model" que encontramos)
 local CarsToTrack = {
     "Onel costa",
     "BNV K3",
@@ -19,8 +18,8 @@ local CarsToTrack = {
 
 -- Variables Globales de Control
 local ESP_ENABLED = false
-local activeESPs = {} -- Rastrea los ESPs activos
-local SelectedCars = {} -- Tabla que guarda los autos seleccionados (ej: SelectedCars["Onel costa"] = true)
+local activeESPs = {} 
+local SelectedCars = {} 
 local FOLDER_TO_SCAN = nil
 
 -- Inicializa la tabla de selección
@@ -42,7 +41,6 @@ end
 -- 🕵️ 3. FUNCIÓN DE IDENTIFICACIÓN
 -- ===============================================
 
--- Esta función revisa dentro del modelo para encontrar su nombre real
 local function GetVehicleFriendlyName(model)
     local friendlyName = model:GetAttribute("Model")
     if friendlyName then
@@ -58,13 +56,12 @@ end
 local Window = Rayfield:CreateWindow({
     Name = "ESP de Vehículos (Selectivo)",
     LoadingTitle = "Cargando Script",
-    LoadingSubtitle = "by Rev",
+    LoadingSubtitle = "by Res",
     ConfigurationSaving = { Enabled = false }, 
     KeySystem = false,
 })
 
 local VisualsTab = Window:CreateTab("Visuales", 4483362458) 
-local ESPSettingsSection = VisualsTab:CreateSection("Control General")
 
 -- ===============================================
 -- 🎯 5. Lógica del ESP (Creación y Limpieza)
@@ -83,7 +80,7 @@ local function CreateBillboardESP(targetModel, displayText)
     bg.Parent = partToTrack
 
     local label = Instance.new("TextLabel")
-    label.Text = displayText -- Muestra "BNV K3"
+    label.Text = displayText 
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.new(1, 1, 0) -- Color Amarillo (para autos en venta)
@@ -108,8 +105,12 @@ end
 -- 🔗 6. Conexión de la Lógica a la Interfaz
 -- ===============================================
 
+-- --- SECCIÓN DE CONTROL GENERAL ---
+VisualsTab:CreateSection("Control General")
+
 -- Toggle principal para encender o apagar todo el sistema
-ESPSettingsSection:CreateToggle({
+-- 🛑 CORRECCIÓN: Llamado en 'VisualsTab', no en 'ESPSettingsSection'
+VisualsTab:CreateToggle({
     Name = "Activar ESP (Autos en Venta)",
     CurrentValue = false, 
     Flag = "MasterESP_Toggle",
@@ -126,12 +127,13 @@ ESPSettingsSection:CreateToggle({
 })
 
 -- --- SECCIÓN DE SELECCIÓN DE AUTOS ---
-local CarSelectionSection = VisualsTab:CreateSection("Vehículos a Rastrear")
+VisualsTab:CreateSection("Vehículos a Rastrear")
 
 -- Crear un Toggle individual para cada auto en nuestra lista
 for _, carName in ipairs(CarsToTrack) do
     
-    CarSelectionSection:CreateToggle({
+    -- 🛑 CORRECCIÓN: Llamado en 'VisualsTab', no en 'CarSelectionSection'
+    VisualsTab:CreateToggle({
         Name = carName, -- "Onel costa", "BNV K3", etc.
         CurrentValue = false,
         Flag = "ESP_Track_" .. carName,
@@ -154,15 +156,12 @@ local function ScanForVehicles()
     for _, model in ipairs(FOLDER_TO_SCAN:GetChildren()) do
         if model:IsA("Model") then
             
-            -- 🛑 ¡NUEVO FILTRO! 🛑
-            -- Verificamos si el auto tiene el atributo "Owner".
+            -- ¡FILTRO DE OWNER!
             if model:GetAttribute("Owner") == nil then
             
-                -- Si no tiene dueño, es un auto en venta. Procedemos a identificarlo.
                 local friendlyName = GetVehicleFriendlyName(model)
 
                 if friendlyName then
-                    -- Verificamos si este auto está en nuestra lista de seleccionados
                     local isSelected = SelectedCars[friendlyName]
                     
                     if isSelected and not activeESPs[model] then
