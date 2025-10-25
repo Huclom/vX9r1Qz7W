@@ -58,7 +58,7 @@ end
 local Window = Rayfield:CreateWindow({
     Name = "ESP de Vehículos (Selectivo)",
     LoadingTitle = "Cargando Script",
-    LoadingSubtitle = "by [Tu Alias]",
+    LoadingSubtitle = "by Rev",
     ConfigurationSaving = { Enabled = false }, 
     KeySystem = false,
 })
@@ -156,7 +156,6 @@ local function ScanForVehicles()
             
             -- 🛑 ¡NUEVO FILTRO! 🛑
             -- Verificamos si el auto tiene el atributo "Owner".
-            -- Si lo tiene (no es 'nil'), lo ignoramos y pasamos al siguiente.
             if model:GetAttribute("Owner") == nil then
             
                 -- Si no tiene dueño, es un auto en venta. Procedemos a identificarlo.
