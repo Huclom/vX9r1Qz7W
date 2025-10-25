@@ -32,7 +32,7 @@ end
 local Window = Rayfield:CreateWindow({
     Name = "ESP de Vehículos (Prueba 2)",
     LoadingTitle = "Cargando Script",
-    LoadingSubtitle = "by [Tu 25]",
+    LoadingSubtitle = "by efesfsdvewdv]",
     ConfigurationSaving = { Enabled = false }, 
     KeySystem = false,
 })
