@@ -13,7 +13,7 @@ local RunService = game:GetService("RunService")
 local CarsToTrack = {
     "Onel costa",
     "BNV K3",
-    -- "Agrega más autos aquí"
+    -- "Agrega más autos aquí si descubres sus nombres"
 }
 
 -- Variables Globales de Control
@@ -22,7 +22,7 @@ local activeESPs = {}
 local SelectedCars = {} 
 local FOLDER_TO_SCAN = nil
 
--- Inicializa la tabla de selección
+-- Inicializa la tabla de selección, todo en 'false'
 for _, carName in ipairs(CarsToTrack) do
     SelectedCars[carName] = false
 end
@@ -41,12 +41,17 @@ end
 -- 🕵️ 3. FUNCIÓN DE IDENTIFICACIÓN
 -- ===============================================
 
+-- Esta función revisa dentro del modelo para encontrar su nombre real
 local function GetVehicleFriendlyName(model)
     local friendlyName = model:GetAttribute("Model")
-    if friendlyName then
-        return friendlyName
+    
+    -- Verificamos si el nombre es un UUID o un nombre real
+    -- Si 'friendlyName' contiene un guion '-', probablemente es un UUID y lo ignoramos.
+    if friendlyName and not string.find(friendlyName, "-") then
+        return friendlyName -- Devuelve "BNV K3", "Onel costa", etc.
     end
-    return nil
+    
+    return nil -- No es un nombre amigable
 end
 
 -- ===============================================
@@ -56,11 +61,12 @@ end
 local Window = Rayfield:CreateWindow({
     Name = "ESP de Vehículos (Selectivo)",
     LoadingTitle = "Cargando Script",
-    LoadingSubtitle = "by Resadsadasd",
+    LoadingSubtitle = "by 352ss",
     ConfigurationSaving = { Enabled = false }, 
     KeySystem = false,
 })
 
+-- Creamos la pestaña principal
 local VisualsTab = Window:CreateTab("Visuales", 4483362458) 
 
 -- ===============================================
@@ -106,12 +112,11 @@ end
 -- ===============================================
 
 -- --- SECCIÓN DE CONTROL GENERAL ---
-VisualsTab:CreateSection("Control General")
+VisualsTab:CreateSection("Control General") -- Esto es solo una etiqueta
 
--- Toggle principal para encender o apagar todo el sistema
--- 🛑 CORRECCIÓN: Llamado en 'VisualsTab', no en 'ESPSettingsSection'
+-- Toggle principal (Llamado desde 'VisualsTab')
 VisualsTab:CreateToggle({
-    Name = "Activar ESP (Autos en Venta)",
+    Name = "Activar ESP (Desguace)",
     CurrentValue = false, 
     Flag = "MasterESP_Toggle",
     Callback = function(Value)
@@ -121,24 +126,23 @@ VisualsTab:CreateToggle({
             CleanupAllESPs()
             Rayfield:Notify({Title = "ESP Desactivado", Content = "Todos los visuales han sido eliminados."})
         else
-             Rayfield:Notify({Title = "ESP Activado", Content = "Buscando vehículos sin dueño."})
+             Rayfield:Notify({Title = "ESP Activado", Content = "Buscando vehículos del desguace."})
         end
     end,
 })
 
 -- --- SECCIÓN DE SELECCIÓN DE AUTOS ---
-VisualsTab:CreateSection("Vehículos a Rastrear")
+VisualsTab:CreateSection("Vehículos a Rastrear") -- Esto es solo una etiqueta
 
 -- Crear un Toggle individual para cada auto en nuestra lista
 for _, carName in ipairs(CarsToTrack) do
     
-    -- 🛑 CORRECCIÓN: Llamado en 'VisualsTab', no en 'CarSelectionSection'
+    -- (Llamado desde 'VisualsVab')
     VisualsTab:CreateToggle({
         Name = carName, -- "Onel costa", "BNV K3", etc.
         CurrentValue = false,
         Flag = "ESP_Track_" .. carName,
         Callback = function(Value)
-            -- Actualiza nuestra tabla de autos seleccionados
             SelectedCars[carName] = Value
         end,
     })
@@ -156,16 +160,20 @@ local function ScanForVehicles()
     for _, model in ipairs(FOLDER_TO_SCAN:GetChildren()) do
         if model:IsA("Model") then
             
-            -- ¡FILTRO DE OWNER!
-            if model:GetAttribute("Owner") == nil then
+            -- 🛑 ¡DOBLE FILTRO! 🛑
+            -- 1. No debe tener 'Owner'
+            -- 2. Debe tener 'Junkyard = true'
+            if model:GetAttribute("Owner") == nil and model:GetAttribute("Junkyard") == true then
             
+                -- Es un auto del desguace. Intentamos obtener su nombre amigable.
                 local friendlyName = GetVehicleFriendlyName(model)
 
                 if friendlyName then
+                    -- Si tiene un nombre (ej: "BNV K3")
                     local isSelected = SelectedCars[friendlyName]
                     
                     if isSelected and not activeESPs[model] then
-                        -- Si está seleccionado y NO tiene un ESP, lo creamos
+                        -- Si lo queremos ver Y no tiene ESP, lo creamos
                         local newESP = CreateBillboardESP(model, friendlyName)
                         if newESP then
                             activeESPs[model] = newESP
@@ -180,7 +188,7 @@ local function ScanForVehicles()
                             end)
                         end
                     elseif not isSelected and activeESPs[model] then
-                        -- Si NO está seleccionado, PERO tiene un ESP, lo destruimos
+                        -- Si NO lo queremos ver, PERO tiene ESP, lo destruimos
                         activeESPs[model]:Destroy()
                         activeESPs[model] = nil
                     end
@@ -200,4 +208,3 @@ local function ScanForVehicles()
 end
 
 RunService.Stepped:Connect(ScanForVehicles)
-
