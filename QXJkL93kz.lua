@@ -9,10 +9,23 @@ local RunService = game:GetService("RunService")
 -- ⚙️ 2. Configuración Principal del ESP
 -- ===============================================
 
+-- 🚨 LISTA DE LOS NOMBRES DE AUTOS QUE QUIERES EN EL MENÚ
+local CarsToTrack = {
+    "Onel costa",
+    "BNV K3",
+    -- "Agrega más autos aquí si descubres sus nombres"
+}
+
+-- Variables Globales de Control
 local ESP_ENABLED = false
-local DEBUG_MODE = false 
 local activeESPs = {} 
+local SelectedCars = {} -- Tabla para guardar qué autos están seleccionados
 local FOLDER_TO_SCAN = nil
+
+-- Inicializa la tabla de selección, todo en 'false'
+for _, carName in ipairs(CarsToTrack) do
+    SelectedCars[carName] = false
+end
 
 pcall(function()
     FOLDER_TO_SCAN = game.Workspace:WaitForChild("Vehicles", 60)
@@ -24,13 +37,43 @@ if not FOLDER_TO_SCAN then
 end
 
 -- ===============================================
--- 🖼️ 3. Creación de la Ventana Rayfield
+-- 🕵️ 3. FUNCIONES DE IDENTIFICACIÓN
+-- ===============================================
+
+-- Función para encontrar el nombre amigable (ignora UUIDs)
+local function GetVehicleFriendlyName(model)
+    local friendlyName = model:GetAttribute("Model")
+    
+    -- Si 'friendlyName' existe Y NO contiene un guion ('-'), es un nombre amigable
+    if friendlyName and not string.find(friendlyName, "-") then
+        return friendlyName -- Devuelve "BNV K3", "Onel costa", etc.
+    end
+    
+    return nil -- Es un UUID o no tiene el atributo
+end
+
+-- Función de búsqueda de partes robusta (¡confirmada que funciona!)
+local function FindAnyPart(instance)
+    if instance:IsA("BasePart") then
+        return instance 
+    end
+    for _, child in ipairs(instance:GetChildren()) do
+        local foundPart = FindAnyPart(child) 
+        if foundPart then
+            return foundPart 
+        end
+    end
+    return nil 
+end
+
+-- ===============================================
+-- 🖼️ 4. Creación de la Ventana Rayfield
 -- ===============================================
 
 local Window = Rayfield:CreateWindow({
-    Name = "ESP de Vehículos (Prueba 3)",
+    Name = "ESP de Vehículos (Selectivo)",
     LoadingTitle = "Cargando Script",
-    LoadingSubtitle = "by aavvss",
+    LoadingSubtitle = "by fasets",
     ConfigurationSaving = { Enabled = false }, 
     KeySystem = false,
 })
@@ -38,42 +81,16 @@ local Window = Rayfield:CreateWindow({
 local VisualsTab = Window:CreateTab("Visuales", 4483362458) 
 
 -- ===============================================
--- 🎯 4. Lógica del ESP (¡CORREGIDA!)
+-- 🎯 5. Lógica del ESP (Creación y Limpieza)
 -- ===============================================
 
--- 🛑 ¡NUEVA FUNCIÓN DE BÚSQUEDA ROBUSTA! 🛑
--- Esta función buscará recursivamente hasta encontrar una BasePart
-local function FindAnyPart(instance)
-    if instance:IsA("BasePart") then
-        return instance -- ¡Encontrada!
-    end
-
-    -- Si no es una parte, mira a sus hijos
-    for _, child in ipairs(instance:GetChildren()) do
-        local foundPart = FindAnyPart(child) -- Llama a la función de nuevo para este hijo
-        if foundPart then
-            return foundPart -- Devuelve la parte encontrada en la recursión
-        end
-    end
-    
-    return nil -- No se encontró nada en esta rama
-end
-
--- Función para crear el BillboardGui (¡MODIFICADA!)
-local function CreateBillboardESP(targetModel)
-    
-    -- Usamos nuestra nueva función de búsqueda
+-- Función para crear el BillboardGui
+local function CreateBillboardESP(targetModel, displayText)
     local partToTrack = targetModel.PrimaryPart or FindAnyPart(targetModel)
 
     if not partToTrack then
-        if DEBUG_MODE then
-            warn("[DEBUG] Falla en CreateBillboardESP: No se encontró NINGUNA 'BasePart' (búsqueda recursiva): " .. targetModel.Name)
-        end
+        -- Falla silenciosa, ya no necesitamos el debug
         return nil 
-    end
-    
-    if DEBUG_MODE then
-        print("[DEBUG] CreateBillboardESP: 'partToTrack' encontrada: " .. partToTrack:GetFullName())
     end
 
     local bg = Instance.new("BillboardGui")
@@ -83,16 +100,11 @@ local function CreateBillboardESP(targetModel)
     bg.Name = "RayfieldVehicleESP"
     bg.Parent = partToTrack
     
-    local modelName = targetModel:GetAttribute("Model") or "???"
-    if type(modelName) == "string" and string.find(modelName, "-") then
-        modelName = modelName:sub(1, 8) 
-    end
-
     local label = Instance.new("TextLabel")
-    label.Text = tostring(modelName)
+    label.Text = displayText -- Muestra "BNV K3", "Onel costa", etc.
     label.Size = UDim2.new(1, 0, 1, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.new(1, 1, 0) 
+    label.TextColor3 = Color3.new(0, 1, 1) -- Color Cyan (para autos seleccionados)
     label.Font = Enum.Font.SourceSansBold
     label.TextScaled = true
     label.Parent = bg
@@ -111,13 +123,14 @@ local function CleanupAllESPs()
 end
 
 -- ===============================================
--- 🔗 5. Conexión de la Lógica a la Interfaz
+-- 🔗 6. Conexión de la Lógica a la Interfaz
 -- ===============================================
 
+-- --- SECCIÓN DE CONTROL GENERAL ---
 VisualsTab:CreateSection("Control General") 
 
 VisualsTab:CreateToggle({
-    Name = "Activar ESP (Desguace)",
+    Name = "Activar ESP (Selectivo)",
     CurrentValue = false, 
     Flag = "MasterESP_Toggle",
     Callback = function(Value)
@@ -126,65 +139,81 @@ VisualsTab:CreateToggle({
             CleanupAllESPs()
             Rayfield:Notify({Title = "ESP Desactivado", Content = "Todos los visuales han sido eliminados."})
         else
-             Rayfield:Notify({Title = "ESP Activado", Content = "Buscando vehículos del desguace."})
+             Rayfield:Notify({Title = "ESP Activado", Content = "Buscando vehículos seleccionados."})
         end
     end,
 })
 
-VisualsTab:CreateToggle({
-    Name = "Modo Depuración (Abre F9)",
-    CurrentValue = false, 
-    Flag = "Debug_Toggle",
-    Callback = function(Value)
-        DEBUG_MODE = Value
-        if Value then
-            Rayfield:Notify({Title = "DEBUG ACTIVADO", Content = "Revisa la consola (F9) para ver el log."})
-        end
-    end,
-})
+-- --- SECCIÓN DE SELECCIÓN DE AUTOS ---
+VisualsTab:CreateSection("Vehículos a Rastrear") 
 
+-- Crear un Toggle individual para cada auto
+for _, carName in ipairs(CarsToTrack) do
+    
+    VisualsTab:CreateToggle({
+        Name = carName, -- "Onel costa", "BNV K3", etc.
+        CurrentValue = false,
+        Flag = "ESP_Track_" .. carName,
+        Callback = function(Value)
+            SelectedCars[carName] = Value
+        end,
+    })
+    
+end
 
 -- ===============================================
--- 🔄 6. Bucle Principal de Escaneo (Sin cambios)
+-- 🔄 7. Bucle Principal de Escaneo
 -- ===============================================
 
 local function ScanForVehicles()
     if not ESP_ENABLED then return end
 
+    -- 1. Escaneo y Actualización
     for _, model in ipairs(FOLDER_TO_SCAN:GetChildren()) do
         if model:IsA("Model") then
             
-            if DEBUG_MODE and not activeESPs[model] then -- Solo imprime para autos nuevos
-                print("[DEBUG] Escaneando: " .. model.Name)
-            end
-
-            -- Filtro por 'Junkyard'
+            -- Filtro: Solo autos del desguace
             if model:GetAttribute("Junkyard") == true then
             
-                if DEBUG_MODE and not activeESPs[model] then
-                    print("[DEBUG] Modelo " .. model.Name .. " es 'Junkyard'. Creando ESP...")
-                end
+                -- Es un auto del desguace. Intentamos obtener su nombre amigable.
+                local friendlyName = GetVehicleFriendlyName(model)
 
-                if not activeESPs[model] then
-                    local newESP = CreateBillboardESP(model)
-                    if newESP then
-                        if DEBUG_MODE then
-                            print("[DEBUG] ESP creado exitosamente para " .. model.Name)
-                        end
-                        activeESPs[model] = newESP
-                        
-                        model.AncestryChanged:Connect(function(_, newParent)
-                            if not newParent or newParent.Name == "Debris" then
-                                if activeESPs[model] then
-                                    activeESPs[model]:Destroy()
-                                    activeESPs[model] = nil
+                if friendlyName then
+                    -- ¡Tiene un nombre amigable! (ej: "BNV K3")
+                    local isSelected = SelectedCars[friendlyName]
+                    
+                    if isSelected and not activeESPs[model] then
+                        -- Si lo queremos ver Y no tiene ESP, lo creamos
+                        local newESP = CreateBillboardESP(model, friendlyName)
+                        if newESP then
+                            activeESPs[model] = newESP
+                            
+                            model.AncestryChanged:Connect(function(_, newParent)
+                                if not newParent or newParent.Name == "Debris" then
+                                    if activeESPs[model] then
+                                        activeESPs[model]:Destroy()
+                                        activeESPs[model] = nil
+                                    end
                                 end
-                            end
-end)
+                            end)
+                        end
+                    elseif not isSelected and activeESPs[model] then
+                        -- Si NO lo queremos ver, PERO tiene ESP, lo destruimos
+                        activeESPs[model]:Destroy()
+                        activeESPs[model] = nil
+                    end
+                else
+                    -- Es un auto del desguace pero con nombre de UUID (ej: "0cd93eb6...")
+                    -- Nos aseguramos de que NO tenga ESP, ya que no es seleccionable.
+                    if activeESPs[model] then
+                        activeESPs[model]:Destroy()
+                        activeESPs[model] = nil
                     end
                 end
             
             else
+                -- No es del desguace (probablemente de un jugador)
+                -- Nos aseguramos de que NO tenga ESP.
                 if activeESPs[model] then
                     activeESPs[model]:Destroy()
                     activeESPs[model] = nil
@@ -193,7 +222,7 @@ end)
         end
     end
 
-    -- Limpieza
+    -- 2. Limpieza de ESPs (para autos que fueron destruidos)
     for model, espElement in pairs(activeESPs) do
         if not model.Parent or not espElement.Parent then
             if espElement.Parent then espElement:Destroy() end
