@@ -25,9 +25,11 @@ local autoBuyCarQueue = {}
 
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
 local AUTOS_PARA_VENDER = {
-    "Merquis C203", "Matsu Lanca", "Lokswag Golo GT", "BNV K5 e39",
+    "Merquis C203", "Missah 750x", "Matsu Lanca", "Lokswag Golo GT", "BNV K5 e39",
     "Four Traffic", "Lokswag Golo MK5", "Toyoda Hellox", "Holde Inteiro",
-    "Leskus not200", "BNV K3", "Missah Silva"
+    "Leskus not200", "BNV K3", "Missah Silva", "Siath Lion", "Fia-Te Ponto",
+    "Peujo 200e6", "Ontel Costa", "Lokswag Golo", "Renas Kapturado", "Sacode Oitava",
+    "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao"
 }
 
 -- NOTA: Eliminamos la variable VENDER_PROMPT de aquí para evitar el error "Infinite yield".
@@ -444,3 +446,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
 end)
 
 print("--- V4.25 (LAZY LOAD) CARGADO ---")
+
