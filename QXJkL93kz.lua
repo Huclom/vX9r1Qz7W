@@ -1,8 +1,8 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V4.42): "LA ASPIRADORA PACIENTE" ---
--- --- FIX: Espera real de 6-8s para el borrado de piezas ---
+-- --- SCRIPT MAESTRO (V4.43): "LA ASPIRADORA ORDENADA" ---
+-- --- NUEVO: Traer piezas (Bring) ANTES de Borrar (Delete) ---
 -- =================================================================
-print("--- CARGANDO MAQUINA DE ESTADO V4.42 (SMART WAIT CLEAN) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.43 (BRING THEN CLEAN) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -35,7 +35,7 @@ local AUTOS_PARA_VENDER = {
     "Leskus not200", "BNV K3", "Missah Silva", "Siath Lion", "Fia-Te Ponto",
     "Peujo 200e6", "Ontel Costa", "Lokswag Golo", "Renas Kapturado", "Sacode Oitava",
     "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao", "Auidy V5",
-    "Sabes Muito", "Xitro J3", "Toyoda Yapp"
+    "Toyoda Yapp", "Xitro J3", "Sabes Muito"
 }
 
 -- --- UTILIDADES UI ---
@@ -69,12 +69,12 @@ local startAutoRepair
 local buyCar
 
 -- --- INTERFAZ GRÁFICA (GUI) ---
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V442"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V443"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.42 (Smart Clean Wait)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.43 (Bring -> Clean)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -174,7 +174,7 @@ startAutoSellLoop = function()
 end
 
 -- =================================================================
--- LOGICA DE REPARACIÓN (V4.42 - Smart Wait Clean)
+-- LOGICA DE REPARACIÓN (V4.43 - Bring Then Clean)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -225,19 +225,30 @@ startAutoRepair = function()
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1)
 
-    -- >>> V4.42 LOGICA DE LIMPIEZA INTELIGENTE <<<
+    -- >>> V4.43 LOGICA MEJORADA: AGRUPAR (BRING) LUEGO BORRAR (DELETE) <<<
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     local existingParts = moveablePartsFolder:GetChildren()
     
     if #existingParts > 0 then
-        print("REPAIR: Detectada basura ("..#existingParts.." piezas). Limpiando...")
-        local deleteBtn = findButtonByExactText("Delete dropped parts")
+        print("REPAIR: Detectada basura ("..#existingParts.."). Iniciando limpieza completa...")
+        RepairStatusLabel.Text = "REPAIR: Agrupando basura..."
         
+        -- PASO 1: TRAER
+        local bringBtn = findButtonByExactText("Bring dropped parts")
+        if bringBtn then
+            clickGUIButton(bringBtn)
+            task.wait(1.5) -- Esperar a que lleguen
+        else
+            print("WARN: No se encontró botón Bring.")
+        end
+
+        -- PASO 2: BORRAR
+        local deleteBtn = findButtonByExactText("Delete dropped parts")
         if deleteBtn then
             clickGUIButton(deleteBtn)
-            RepairStatusLabel.Text = "REPAIR: Limpiando (Espera 6s)..."
+            RepairStatusLabel.Text = "REPAIR: Borrando (Espera Smart)..."
             
-            -- ESPERA ACTIVA (Hasta 8 segundos o hasta que se vacíe)
+            -- PASO 3: ESPERA INTELIGENTE
             for i = 1, 8 do
                 if #moveablePartsFolder:GetChildren() == 0 then
                     print("REPAIR: ¡Limpieza completada en "..i.."s!")
@@ -249,7 +260,7 @@ startAutoRepair = function()
             print("WARN: No se encontró botón Delete.")
         end
     else
-        print("REPAIR: Suelo limpio, omitiendo espera.")
+        print("REPAIR: Suelo limpio, omitiendo limpieza.")
     end
     -- >>> FIN LIMPIEZA <<<
     
@@ -530,4 +541,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.42 (SMART WAIT) LISTA ---")
+print("--- V4.43 (BRING THEN CLEAN) LISTA ---")
