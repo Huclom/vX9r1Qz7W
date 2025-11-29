@@ -36,7 +36,8 @@ local AUTOS_PARA_VENDER = {
     "Four Traffic", "Lokswag Golo MK5", "Toyoda Hellox", "Holde Inteiro",
     "Leskus not200", "BNV K3", "Missah Silva", "Siath Lion", "Fia-Te Ponto",
     "Peujo 200e6", "Ontel Costa", "Lokswag Golo", "Renas Kapturado", "Sacode Oitava",
-    "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao", "Auidy V5"
+    "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao", "Auidy V5",
+    "Toyoda Yapp", "Xitro J3", "Sabes Muito"
 }
 
 -- --- 3. UTILIDADES UI (Necesarias para el botón 'Traer Piezas') ---
@@ -519,3 +520,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
 end)
 
 print("--- V4.40 (FULL AUTO) LISTA ---")
+
