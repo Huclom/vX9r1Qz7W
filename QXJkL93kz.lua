@@ -1,4 +1,4 @@
-print("--- CARGANDO MAQUINA DE ESTADO V4.20 (HOOD ORDER & TRANS VALUE FIX) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.22 (VALUES FOLDER LOOKUP FIX) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -68,12 +68,12 @@ local buyCar
 local startAutoSellLoop
 local processBuyQueue
 
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V420"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V422"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.20 (Hood Order & Value Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.22 (Values Folder Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Name = "MasterToggleButton"; MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -84,7 +84,6 @@ local AutoBuyCarStatusLabel = Instance.new("TextLabel"); AutoBuyCarStatusLabel.T
 local RepairStatusLabel = Instance.new("TextLabel"); RepairStatusLabel.Text = "REPAIR: Inactivo"; RepairStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); RepairStatusLabel.Position = UDim2.new(0.05, 0, 0, 185); RepairStatusLabel.BackgroundTransparency = 1; RepairStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); RepairStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; RepairStatusLabel.Parent = MainFrame
 local SellStatusLabel = Instance.new("TextLabel"); SellStatusLabel.Text = "VENTA: Inactiva"; SellStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); SellStatusLabel.Position = UDim2.new(0.05, 0, 0, 210); SellStatusLabel.BackgroundTransparency = 1; SellStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); SellStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; SellStatusLabel.Parent = MainFrame
 
--- Botón Manual de Basura
 local TrashManualButton = Instance.new("TextButton"); TrashManualButton.Text = "🗑️"; TrashManualButton.Size = UDim2.new(0.2, 0, 0, 25); TrashManualButton.Position = UDim2.new(0.75, 0, 0, 245); TrashManualButton.BackgroundColor3 = Color3.fromRGB(100, 30, 30); TrashManualButton.TextColor3 = Color3.fromRGB(255, 255, 255); TrashManualButton.Parent = MainFrame
 local TrashLabel = Instance.new("TextLabel"); TrashLabel.Text = "Borrar Suelo:"; TrashLabel.Size = UDim2.new(0.6, 0, 0, 25); TrashLabel.Position = UDim2.new(0.1, 0, 0, 245); TrashLabel.BackgroundTransparency = 1; TrashLabel.TextColor3 = Color3.fromRGB(200, 200, 200); TrashLabel.TextXAlignment = Enum.TextXAlignment.Right; TrashLabel.Parent = MainFrame
 TrashManualButton.MouseButton1Click:Connect(function() local b = findButtonByExactText("Delete dropped parts"); if b then clickGUIButton(b) end end)
@@ -144,22 +143,15 @@ buyCar = function(carModel)
     local root = player.Character:FindFirstChild("HumanoidRootPart")
     if not root then isAutoBuyCarBuying = false; return end
 
-    print("COMPRA: Moviendo al auto...")
     root.CFrame = carModel:GetPivot() * CFrame.new(-8, 0, 0)
     task.wait(0.8)
     fireclickdetector(cd)
-    task.wait(0.5) -- Esperar confirmación de compra
+    task.wait(0.5) 
     
-    -- >>> NUEVO ORDEN: ABRIR CAPO AQUÍ <<<
-    print("COMPRA: Intentando abrir capó inmediatamente (distancia cercana)...")
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true):FindFirstChild("ClickDetector")
-    
     if hoodCD then
         fireclickdetector(hoodCD)
-        print("COMPRA: ¡Capó activado! Esperando animación...")
         task.wait(1.5) 
-    else
-        print("COMPRA: No se encontró capó (o no tiene). Continuando...")
     end
 
     if currentMode == "BUY_REPAIR" then
@@ -171,19 +163,18 @@ buyCar = function(carModel)
 end
 
 -- ==============================================================================
--- LOGICA DE REPARACION (V4.20)
+-- LOGICA DE REPARACION (V4.22 - VALUES FOLDER SEARCH)
 -- ==============================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY_REPAIR" and not isRepairRunning then return end
-    task.wait(1) -- Pequeña pausa tras abrir capó
-    RepairStatusLabel.Text = "REPAIR: V4.20..."
+    task.wait(1)
+    RepairStatusLabel.Text = "REPAIR: V4.22..."
 
     local character = player.Character
     local rootPart = character:WaitForChild("HumanoidRootPart")
     local humanoid = character:FindFirstChild("Humanoid")
     if humanoid then humanoid.Sit = false; humanoid.Jump = true end
 
-    -- Mapa base (Ranura -> Maquina)
     local machineMap = {
         ["Battery"] = "BatteryCharger",
         ["AirIntake"] = "PartsWasher",
@@ -193,7 +184,7 @@ startAutoRepair = function()
         ["ExhaustManifold"] = "GrindingMachine",
         ["Suspension"] = "GrindingMachine",
         ["Alternator"] = "GrindingMachine",
-        ["Transmission"] = "GrindingMachine" -- Se mapeará dinámicamente
+        ["Transmission"] = "GrindingMachine"
     }
 
     local function getPitStop()
@@ -224,55 +215,59 @@ startAutoRepair = function()
     
     if not pitStop or not carModel then isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return end
     
-    -- Ahora hacemos el TP al taller (El capó YA debe estar abierto)
-    print("REPAIR: Moviendo al taller...")
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1)
 
     local carPartsEvent = carModel:FindFirstChild("PartsEvent")
     local engineBay = carModel:FindFirstChild("Body", true) and carModel:FindFirstChild("Body", true):FindFirstChild("EngineBay", true)
-    local carData = carModel:FindFirstChild("Values", true) and carModel:FindFirstChild("Values", true):FindFirstChild("Engine", true)
+    
+    -- >>> CLAVE V4.22: CARGAMOS LA CARPETA 'VALUES' CORRECTAMENTE <<<
+    local carValuesFolder = carModel:FindFirstChild("Values", true) and carModel:FindFirstChild("Values", true):FindFirstChild("Engine", true)
+    local carEngineData = carValuesFolder -- Alias para claridad
 
-    if not carPartsEvent or not engineBay then isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return end
+    if not carPartsEvent or not engineBay or not carValuesFolder then 
+        print("ERROR: No se encontraron las carpetas Body o Values del auto.")
+        isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return 
+    end
 
     local allPartNames = {}
     local partsToRepair_Names = {} 
     local partsToBuy_Data = {} 
-    
-    -- Mapa: Nombre en Motor -> Nombre en Suelo
     local droppedPartNameMap = {} 
     
-    local engineType = carData.EngineBlock.Value
+    local engineType = carEngineData:FindFirstChild("EngineBlock") and carEngineData.EngineBlock.Value or ""
+
+    print("Analizando motor: " .. engineType)
 
     for _, partModel in ipairs(engineBay:GetChildren()) do
         if partModel:IsA("Model") and partModel:FindFirstChild("Main") then
-            local fullPartName = partModel.Name -- Ej: "V8Transmission"
-            
-            -- 1. Obtener nombre base limpio
+            local fullPartName = partModel.Name 
             local basePartName = fullPartName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
             
-            -- 2. Detectar nombre REAL al caer (Leyendo StringValue "Value")
-            local droppedName = basePartName -- Por defecto es igual
-            local valueObj = partModel:FindFirstChild("Value")
+            -- >>> DETECCIÓN V4.22: Buscamos en la carpeta VALUES, no en el modelo físico <<<
+            local droppedName = basePartName 
+            
+            -- Buscamos el StringValue correspondiente en carValuesFolder
+            local valueObj = carValuesFolder:FindFirstChild(basePartName)
             
             if valueObj and valueObj:IsA("StringValue") then
-                -- Formato esperado: "Transmission|6-Speed Manual"
+                -- Leemos: "Transmission|6-Speed Manual"
                 local splitVal = string.split(valueObj.Value, "|")
                 if #splitVal >= 2 then
                     droppedName = splitVal[2] -- "6-Speed Manual"
-                    print("   [INFO] Pieza Compuesta: "..basePartName.." -> Cae como: "..droppedName)
+                    print("   [VALUES] Mapeado: " .. basePartName .. " -> " .. droppedName)
                 end
+            else
+                -- Si no existe en Values con nombre exacto, intentamos limpieza extra o fallback
+                print("   [VALUES] No se encontró StringValue para: " .. basePartName)
             end
             
-            -- Guardamos el mapa: "V8Transmission" -> "6-Speed Manual"
             droppedPartNameMap[fullPartName] = droppedName
-
             table.insert(allPartNames, fullPartName) 
             
-            if machineMap[basePartName] then
+            if machineMap[basePartName] or basePartName:find("Transmission") then
                 table.insert(partsToRepair_Names, fullPartName)
             else
-                -- Si no es reparable, compramos usando el nombre compuesto si existe
                 local partString = "ENGINE|" .. engineType .. "|" .. droppedName
                 table.insert(partsToBuy_Data, partString)
             end
@@ -324,17 +319,15 @@ startAutoRepair = function()
         for _, partSlotName in ipairs(partsToRepair_Names) do
             if not isRepairRunning then break end 
             
-            -- AQUI ESTA LA MAGIA V4.20:
-            -- Buscamos en el suelo usando el nombre MAPEADO ("6-Speed Manual")
             local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
             local partObject = moveablePartsFolder:FindFirstChild(targetDroppedName)
             
             if partObject then
                 local wear = partObject:GetAttribute("Wear") or 0
                 if wear > 0 then
-                    -- Calculamos máquina basada en el nombre de la ranura (Ej: Transmission -> Grinder)
                     local basePartName = partSlotName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
-                    
+                    if basePartName:find("Transmission") then basePartName = "Transmission" end
+
                     local machineName = machineMap[basePartName]
                     local pool = machinePools[machineName]
                     if pool and #pool > 0 then
@@ -377,11 +370,9 @@ startAutoRepair = function()
     while not (buy_done and repair_done) and isRepairRunning do task.wait(0.5) end
     if not isRepairRunning then return end
 
-    -- REINSTALACION (Usando el mapa también)
+    -- REINSTALACION
     for _, partSlotName in ipairs(allPartNames) do
         if not isRepairRunning then break end 
-        
-        -- Nombre físico que buscamos en el suelo
         local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
         local partToInstall = nil
         
@@ -391,14 +382,12 @@ startAutoRepair = function()
                 partToInstall = p; break
             end
         end
-
         if partToInstall then
             pcall(function() carPartsEvent:FireServer("ReapplyPart", partToInstall, partSlotName) end)
             task.wait(0.15)
         end
     end
 
-    -- Capó ya estaba abierto, intentamos cerrarlo
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true):FindFirstChild("ClickDetector")
     if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
     
@@ -445,4 +434,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.20 (FINAL LOGIC) CARGADO ---")
+print("--- V4.22 (VALUES FOLDER FIX) CARGADO ---")
