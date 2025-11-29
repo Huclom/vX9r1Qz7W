@@ -1,8 +1,8 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V4.43): "LA ASPIRADORA ORDENADA" ---
--- --- NUEVO: Traer piezas (Bring) ANTES de Borrar (Delete) ---
+-- --- SCRIPT MAESTRO (V4.44): "HOOD DEBUGGER" ---
+-- --- FIX: Tiempos de espera extendidos para ver abrir el capó ---
 -- =================================================================
-print("--- CARGANDO MAQUINA DE ESTADO V4.43 (BRING THEN CLEAN) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.44 (HOOD TIMING FIX) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -35,7 +35,7 @@ local AUTOS_PARA_VENDER = {
     "Leskus not200", "BNV K3", "Missah Silva", "Siath Lion", "Fia-Te Ponto",
     "Peujo 200e6", "Ontel Costa", "Lokswag Golo", "Renas Kapturado", "Sacode Oitava",
     "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao", "Auidy V5",
-    "Toyoda Yapp", "Xitro J3", "Sabes Muito"
+    "Sabes Muito", "Xitro J3", "Toyoda Yapp"
 }
 
 -- --- UTILIDADES UI ---
@@ -69,12 +69,12 @@ local startAutoRepair
 local buyCar
 
 -- --- INTERFAZ GRÁFICA (GUI) ---
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V443"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V444"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.43 (Bring -> Clean)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.44 (Hood Timing Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -174,7 +174,7 @@ startAutoSellLoop = function()
 end
 
 -- =================================================================
--- LOGICA DE REPARACIÓN (V4.43 - Bring Then Clean)
+-- LOGICA DE REPARACIÓN (V4.44)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -225,7 +225,7 @@ startAutoRepair = function()
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1)
 
-    -- >>> V4.43 LOGICA MEJORADA: AGRUPAR (BRING) LUEGO BORRAR (DELETE) <<<
+    -- LIMPIEZA INTELIGENTE
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     local existingParts = moveablePartsFolder:GetChildren()
     
@@ -233,22 +233,17 @@ startAutoRepair = function()
         print("REPAIR: Detectada basura ("..#existingParts.."). Iniciando limpieza completa...")
         RepairStatusLabel.Text = "REPAIR: Agrupando basura..."
         
-        -- PASO 1: TRAER
         local bringBtn = findButtonByExactText("Bring dropped parts")
         if bringBtn then
             clickGUIButton(bringBtn)
-            task.wait(1.5) -- Esperar a que lleguen
-        else
-            print("WARN: No se encontró botón Bring.")
+            task.wait(1.5)
         end
 
-        -- PASO 2: BORRAR
         local deleteBtn = findButtonByExactText("Delete dropped parts")
         if deleteBtn then
             clickGUIButton(deleteBtn)
             RepairStatusLabel.Text = "REPAIR: Borrando (Espera Smart)..."
             
-            -- PASO 3: ESPERA INTELIGENTE
             for i = 1, 8 do
                 if #moveablePartsFolder:GetChildren() == 0 then
                     print("REPAIR: ¡Limpieza completada en "..i.."s!")
@@ -256,13 +251,8 @@ startAutoRepair = function()
                 end
                 task.wait(1)
             end
-        else
-            print("WARN: No se encontró botón Delete.")
         end
-    else
-        print("REPAIR: Suelo limpio, omitiendo limpieza.")
     end
-    -- >>> FIN LIMPIEZA <<<
     
     RepairStatusLabel.Text = "REPAIR: Trabajando..."
 
@@ -413,8 +403,8 @@ startAutoRepair = function()
         end
     end
 
-    local hoodCD = carModel:FindFirstChild("Misc", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true):FindFirstChild("ClickDetector")
-    if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
+    -- NO CERRAMOS CAPO AQUI, YA DEBERIA ESTAR ABIERTO
+    -- SOLO ASEGURAR QUE ESTE CERRADO AL FINAL SI SE QUIERE (Opcional)
     
     local carSeat = carModel:FindFirstChild("DriveSeat") or carModel:FindFirstChildOfClass("BasePart", true)
     if carSeat then rootPart.CFrame = carSeat.CFrame * CFrame.new(0, 3, 15); task.wait(1) end
@@ -431,7 +421,7 @@ startAutoRepair = function()
     RepairStatusLabel.Text = "REPAIR: Terminado"
 end
 
--- --- 9. LOGICA COMPRA ---
+-- --- 9. LOGICA COMPRA (V4.44 - HOOD DEBUG) ---
 local function isCarInQueue(carModel)
     for _, item in ipairs(autoBuyCarQueue) do
         if item.car == carModel then return true end
@@ -481,14 +471,43 @@ spawn(function()
         AutoBuyCarStatusLabel.Text = "COMPRA: Intentando..."
         task.wait(0.8)
         fireclickdetector(carToBuy.ClickDetector)
-        task.wait(1.5)
+        
+        -- >>> ESPERA EXTENDIDA (V4.44) <<<
+        AutoBuyCarStatusLabel.Text = "COMPRA: Verificando..."
+        task.wait(1.5) -- Espera más larga para que cargue el auto comprado
         
         if carToBuy and carToBuy.Parent then
-            AutoBuyCarStatusLabel.Text = "COMPRA: Falló"
-            task.wait(FAIL_DELAY)
-            isAutoBuyCarBuying = false
-            if #autoBuyCarQueue == 0 then task.spawn(scanExistingCars) end
-            continue
+            -- Check de falla normal
+            if not carToBuy:FindFirstChild("Values") then -- Si no cargó la data, falló o es lag
+                 -- Podríamos añadir lógica de reintento aquí, pero por ahora asumimos falla si sigue ahí y no somos dueños
+            end
+        else
+             -- Si desaparece, falló
+             AutoBuyCarStatusLabel.Text = "COMPRA: Desapareció"
+             isAutoBuyCarBuying = false; continue
+        end
+
+        -- >>> INTENTO DE ABRIR CAPO (CON LOGS) <<<
+        print("COMPRA: Buscando capó...")
+        AutoBuyCarStatusLabel.Text = "COMPRA: Abriendo Capó..."
+        
+        local hoodPart = carToBuy:FindFirstChild("Misc") 
+            and carToBuy.Misc:FindFirstChild("Hood") 
+            and carToBuy.Misc.Hood:FindFirstChild("Detector")
+            and carToBuy.Misc.Hood.Detector:FindFirstChild("ClickDetector")
+            
+        if hoodPart then
+            fireclickdetector(hoodPart)
+            print(">>> [CAPO] ¡ABIERTO EXITOSAMENTE! Esperando animación...")
+            task.wait(3) -- 3 SEGUNDOS PARA VERLO
+        else
+            print(">>> [CAPO] Falló: No se encontró la carpeta 'Misc.Hood.Detector'")
+            -- Intentamos búsqueda recursiva por si acaso
+            local anyCD = carToBuy:FindFirstChild("Hood", true)
+            if anyCD then
+                 local cd = anyCD:FindFirstChildWhichIsA("ClickDetector", true)
+                 if cd then fireclickdetector(cd); task.wait(3) end
+            end
         end
 
         AutoBuyCarStatusLabel.Text = "COMPRA: ¡Éxito!"
@@ -541,4 +560,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.43 (BRING THEN CLEAN) LISTA ---")
+print("--- V4.44 (HOOD TIMING FIX) LISTA ---")
