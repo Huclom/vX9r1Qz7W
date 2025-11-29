@@ -1,10 +1,9 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V4.40): "LA ASPIRADORA MECÁNICA" ---
--- --- FUSIÓN: Compra Agresiva (V4.39) + Auto-Repair (V4.25) ---
+-- --- SCRIPT MAESTRO (V4.41): "LA ASPIRADORA LIMPIA" ---
+-- --- AÑADIDO: Borrado automático de basura al iniciar reparación ---
 -- =================================================================
-print("--- CARGANDO MAQUINA DE ESTADO V4.40 (FULL AUTO) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.41 (AUTO-CLEAN) ---")
 
--- --- 1. SERVICIOS ---
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,12 +21,11 @@ local remoteLoad = RS_Events:WaitForChild("Vehicles"):WaitForChild("RemoteLoad")
 local setPaintEvent = RS_Events and RS_Events:FindFirstChild("Vehicles", true) and RS_Events:FindFirstChild("Vehicles", true):FindFirstChild("SetPaint")
 local VEHICLES_FOLDER = Workspace:WaitForChild("Vehicles", 10)
 
--- --- 2. CONFIGURACIÓN ---
+-- --- CONFIGURACIÓN ---
 local currentMode = "OFF"
 local isAutoBuyCarBuying = false 
 local autoBuyCarQueue = {} 
-local isRepairRunning = false -- Nuevo flag para reparación
-
+local isRepairRunning = false 
 local FAIL_DELAY = 5 
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
 
@@ -40,7 +38,7 @@ local AUTOS_PARA_VENDER = {
     "Toyoda Yapp", "Xitro J3", "Sabes Muito"
 }
 
--- --- 3. UTILIDADES UI (Necesarias para el botón 'Traer Piezas') ---
+-- --- UTILIDADES UI ---
 local function findButtonByExactText(textToFind)
     local topbar = playerGui:FindFirstChild("TopbarStandardClipped")
     local container = topbar and topbar:FindFirstChild("ClippedContainer")
@@ -64,19 +62,19 @@ local function clickGUIButton(uiObject)
     return true
 end
 
--- --- 4. DECLARACIÓN ADELANTADA ---
+-- --- DECLARACIÓN ADELANTADA ---
 local startAutoSellLoop
 local scanExistingCars
-local startAutoRepair -- ¡Ahora sí existe!
+local startAutoRepair
 local buyCar
 
--- --- 5. INTERFAZ GRÁFICA (GUI) ---
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V440"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+-- --- INTERFAZ GRÁFICA (GUI) ---
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V441"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.40 (Aspiradora Mecánica)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.41 (Auto-Clean)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -103,7 +101,6 @@ local function updateGUI(mode)
 end
 updateGUI(currentMode)
 
--- --- 6. LOGICA MAESTRA ---
 local function masterOnClientInvoke(text)
     if currentMode == "BUY" or currentMode == "SELL" then return true end
     if _G.Confirmation then return _G.Confirmation(text) end
@@ -123,13 +120,12 @@ if NOTIFY_REMOTE then
     NOTIFY_REMOTE.OnClientEvent:Connect(function(text)
         if currentMode == "BUY" and text == "Garage limit reached" then 
             currentMode = "SELL"; updateGUI(currentMode)
-            if isRepairRunning then isRepairRunning = false end -- Detener reparación forzosamente
+            if isRepairRunning then isRepairRunning = false end 
             task.spawn(startAutoSellLoop)
         end
     end)
 end
 
--- --- 7. LOGICA VENTA (Lazy Load) ---
 local function getSellPrompt()
     local map = Workspace:FindFirstChild("Map")
     local sellCar = map and map:FindFirstChild("SellCar")
@@ -162,12 +158,9 @@ startAutoSellLoop = function()
             
             if carInWorld then
                 carInWorld:PivotTo(targetCFrame)
-                
-                -- Pintura antes de venta (Extra Cash)
                 if setPaintEvent then
                    pcall(function() setPaintEvent:FireServer(carInWorld, Color3.fromHSV(math.random(), 1, 1)) end)
                 end
-                
                 task.wait(0.5)
                 if promptVenta then pcall(fireproximityprompt, promptVenta, 0) end
                 task.wait(2.5)
@@ -180,7 +173,9 @@ startAutoSellLoop = function()
     task.spawn(scanExistingCars)
 end
 
--- --- 8. LOGICA DE REPARACIÓN (Importada V4.25) ---
+-- =================================================================
+-- LOGICA DE REPARACIÓN (V4.41 - Con Auto Limpieza)
+-- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
     isRepairRunning = true
@@ -198,7 +193,6 @@ startAutoRepair = function()
         ["Suspension"] = "GrindingMachine", ["Alternator"] = "GrindingMachine", ["Transmission"] = "GrindingMachine"
     }
 
-    -- Funciones Locales de Reparación
     local function getPitStop()
         local map = Workspace:WaitForChild("Map")
         local pitStopPosition = Vector3.new(-981.30127, 18.0568581, -129.036621)
@@ -227,8 +221,20 @@ startAutoRepair = function()
     
     if not pitStop or not carModel then isRepairRunning = false; return end
     
+    -- TP AL TALLER
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1)
+
+    -- >>> V4.41 AGREGADO: LIMPIEZA INICIAL <<<
+    print("REPAIR: Limpiando basura del trabajo anterior...")
+    local deleteBtn = findButtonByExactText("Delete dropped parts")
+    if deleteBtn then
+        clickGUIButton(deleteBtn)
+        task.wait(1) -- Esperamos a que se limpie
+    else
+        print("WARN: No se encontró botón Delete, omitiendo limpieza.")
+    end
+    -- >>> FIN LIMPIEZA <<<
 
     local carPartsEvent = carModel:FindFirstChild("PartsEvent")
     local engineBay = carModel:FindFirstChild("Body", true) and carModel:FindFirstChild("Body", true):FindFirstChild("EngineBay", true)
@@ -279,7 +285,6 @@ startAutoRepair = function()
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     local shopFolder = Workspace:WaitForChild("PartsStore"):WaitForChild("SpareParts"):WaitForChild("Parts")
 
-    -- Hilo de Compra
     local function do_parallel_buy()
         for _, partString in ipairs(partsToBuy_Data) do
             if not isRepairRunning then break end
@@ -290,7 +295,6 @@ startAutoRepair = function()
         return true
     end
 
-    -- Preparación de Máquinas
     local machinePools = { BatteryCharger = {}, GrindingMachine = {}, PartsWasher = {} }
     local machineClickDetectors = {} 
     for _, machine in ipairs(pitStop:GetChildren()) do
@@ -307,7 +311,6 @@ startAutoRepair = function()
     end
     local machineIndexes = { BatteryCharger = 1, GrindingMachine = 1, PartsWasher = 1 }
 
-    -- Hilo de Reparación
     local function do_parallel_repair()
         local partsBeingRepaired = {} 
         for _, partSlotName in ipairs(partsToRepair_Names) do
@@ -364,7 +367,6 @@ startAutoRepair = function()
     while not (buy_done and repair_done) and isRepairRunning do task.wait(0.5) end
     if not isRepairRunning then return end
 
-    -- Reinstalación
     for _, partSlotName in ipairs(allPartNames) do
         if not isRepairRunning then break end 
         local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
@@ -388,7 +390,6 @@ startAutoRepair = function()
     local carSeat = carModel:FindFirstChild("DriveSeat") or carModel:FindFirstChildOfClass("BasePart", true)
     if carSeat then rootPart.CFrame = carSeat.CFrame * CFrame.new(0, 3, 15); task.wait(1) end
 
-    -- Pintura Final
     local paintPrompt = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint"):FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
     if paintPrompt and setPaintEvent then
         pcall(fireproximityprompt, paintPrompt, 0)
@@ -401,7 +402,7 @@ startAutoRepair = function()
     RepairStatusLabel.Text = "REPAIR: Terminado"
 end
 
--- --- 9. LOGICA COMPRA (V4.40 - Con llamada a Repair) ---
+-- --- 9. LOGICA COMPRA ---
 local function isCarInQueue(carModel)
     for _, item in ipairs(autoBuyCarQueue) do
         if item.car == carModel then return true end
@@ -437,28 +438,23 @@ spawn(function()
         local item = table.remove(autoBuyCarQueue, 1)
         local carToBuy = item.car
         
-        -- Validación de existencia
         if not carToBuy or not carToBuy.Parent or not carToBuy:FindFirstChild("ClickDetector") then
-            print("...Auto inválido en cola. Saltando.")
             isAutoBuyCarBuying = false
             if #autoBuyCarQueue == 0 then task.spawn(scanExistingCars) end
             continue
         end
 
-        -- Teletransporte y Compra
         repeat task.wait(0.1) until player.Character
         local root = player.Character:FindFirstChild("HumanoidRootPart")
         if not root then isAutoBuyCarBuying = false; continue end
         
-        print("COMPRA: Yendo a por " .. carToBuy.Name)
         root.CFrame = carToBuy:GetPivot() * CFrame.new(-8, 0, 0)
         AutoBuyCarStatusLabel.Text = "COMPRA: Intentando..."
         task.wait(0.8)
         fireclickdetector(carToBuy.ClickDetector)
-        task.wait(1.5) -- Esperar confirmación
+        task.wait(1.5)
         
         if carToBuy and carToBuy.Parent then
-            print("COMPRA: Fallida (alguien más lo ganó o lag).")
             AutoBuyCarStatusLabel.Text = "COMPRA: Falló"
             task.wait(FAIL_DELAY)
             isAutoBuyCarBuying = false
@@ -466,17 +462,14 @@ spawn(function()
             continue
         end
 
-        print("COMPRA: ¡Éxito!")
         AutoBuyCarStatusLabel.Text = "COMPRA: ¡Éxito!"
         
-        -- >>> LA FUSIÓN: REPARAR INMEDIATAMENTE <<<
         if currentMode == "BUY" then
-            startAutoRepair() -- Llama a la lógica de V4.25
+            startAutoRepair()
         end
         
         isAutoBuyCarBuying = false
         if currentMode == "BUY" and #autoBuyCarQueue == 0 then
-            print("...Cola vacía post-reparación. Re-escaneando.")
             task.spawn(scanExistingCars)
         end
     end
@@ -519,5 +512,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.40 (FULL AUTO) LISTA ---")
-
+print("--- V4.41 (AUTO-CLEAN) LISTA ---")
