@@ -1,4 +1,4 @@
-print("--- CARGANDO MAQUINA DE ESTADO V4.22 (VALUES FOLDER LOOKUP FIX) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.23 (UNLIMITED BUY & SMART QUEUE) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -23,14 +23,12 @@ local repairThread = nil
 local isAutoBuyCarBuying = false
 local autoBuyCarQueue = {} 
 
-local MAX_PERCENT = 10
+-- YA NO HAY LIMITE DE PORCENTAJE (Compra todo)
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
 local AUTOS_PARA_VENDER = {
-    "Merquis C203", "Missah 750x", "Matsu Lanca", "Lokswag Golo GT", "BNV K5 e39",
+    "Merquis C203", "Matsu Lanca", "Lokswag Golo GT", "BNV K5 e39",
     "Four Traffic", "Lokswag Golo MK5", "Toyoda Hellox", "Holde Inteiro",
-    "Leskus not200", "BNV K3", "Missah Silva", "Siath Lion", "Fia-Te Ponto",
-    "Peujo 200e6", "Ontel Costa", "Lokswag Golo", "Renas Kapturado", "Sacode Oitava",
-    "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao"
+    "Leskus not200", "BNV K3", "Missah Silva"
 }
 local VENDER_PROMPT = Workspace:WaitForChild("Map"):WaitForChild("SellCar"):WaitForChild("Prompt"):WaitForChild("ProximityPrompt")
 
@@ -68,18 +66,18 @@ local buyCar
 local startAutoSellLoop
 local processBuyQueue
 
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V422"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V423"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.22 (Values Folder Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.23 (Unlimited Buy)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Name = "MasterToggleButton"; MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
 
 local StatusMode = Instance.new("TextLabel"); StatusMode.Text = "MODO: OFF"; StatusMode.Size = UDim2.new(0.9, 0, 0, 20); StatusMode.Position = UDim2.new(0.05, 0, 0, 90); StatusMode.BackgroundTransparency = 1; StatusMode.TextColor3 = Color3.fromRGB(255, 255, 100); StatusMode.TextXAlignment = Enum.TextXAlignment.Left; StatusMode.Parent = MainFrame
-local AutoBuyCarInfoLabel = Instance.new("TextLabel"); AutoBuyCarInfoLabel.Text = "Esperando..."; AutoBuyCarInfoLabel.Size = UDim2.new(0.9, 0, 0, 40); AutoBuyCarInfoLabel.Position = UDim2.new(0.05, 0, 0, 115); AutoBuyCarInfoLabel.BackgroundTransparency = 1; AutoBuyCarInfoLabel.TextColor3 = Color3.fromRGB(150, 255, 255); AutoBuyCarInfoLabel.TextWrapped = true; AutoBuyCarInfoLabel.TextXAlignment = Enum.TextXAlignment.Left; AutoBuyCarInfoLabel.Parent = MainFrame
+local AutoBuyCarInfoLabel = Instance.new("TextLabel"); AutoBuyCarInfoLabel.Text = "Cola: 0 autos"; AutoBuyCarInfoLabel.Size = UDim2.new(0.9, 0, 0, 40); AutoBuyCarInfoLabel.Position = UDim2.new(0.05, 0, 0, 115); AutoBuyCarInfoLabel.BackgroundTransparency = 1; AutoBuyCarInfoLabel.TextColor3 = Color3.fromRGB(150, 255, 255); AutoBuyCarInfoLabel.TextWrapped = true; AutoBuyCarInfoLabel.TextXAlignment = Enum.TextXAlignment.Left; AutoBuyCarInfoLabel.Parent = MainFrame
 local AutoBuyCarStatusLabel = Instance.new("TextLabel"); AutoBuyCarStatusLabel.Text = "COMPRA: Inactiva"; AutoBuyCarStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); AutoBuyCarStatusLabel.Position = UDim2.new(0.05, 0, 0, 160); AutoBuyCarStatusLabel.BackgroundTransparency = 1; AutoBuyCarStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); AutoBuyCarStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; AutoBuyCarStatusLabel.Parent = MainFrame
 local RepairStatusLabel = Instance.new("TextLabel"); RepairStatusLabel.Text = "REPAIR: Inactivo"; RepairStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); RepairStatusLabel.Position = UDim2.new(0.05, 0, 0, 185); RepairStatusLabel.BackgroundTransparency = 1; RepairStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); RepairStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; RepairStatusLabel.Parent = MainFrame
 local SellStatusLabel = Instance.new("TextLabel"); SellStatusLabel.Text = "VENTA: Inactiva"; SellStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); SellStatusLabel.Position = UDim2.new(0.05, 0, 0, 210); SellStatusLabel.BackgroundTransparency = 1; SellStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); SellStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; SellStatusLabel.Parent = MainFrame
@@ -131,9 +129,33 @@ startAutoSellLoop = function()
     currentMode = "BUY_REPAIR"; processBuyQueue()
 end
 
+-- >>> COLA INTELIGENTE V4.23 <<<
 processBuyQueue = function()
+    -- Paso 1: Limpieza de Fantasmas
+    -- Revisamos la cola desde el principio. Si el primer auto ya no existe (Parent nil), lo borramos y revisamos el siguiente.
+    while #autoBuyCarQueue > 0 do
+        local checkCar = autoBuyCarQueue[1]
+        if checkCar and checkCar.Parent and checkCar:FindFirstChild("ClickDetector", true) then
+            -- El auto existe y tiene click detector. Es válido.
+            break 
+        else
+            -- El auto desapareció o ya no es válido
+            print("QUEUE: Auto en cola desapareció (Despawn). Eliminando de la lista...")
+            table.remove(autoBuyCarQueue, 1)
+        end
+    end
+    
+    AutoBuyCarInfoLabel.Text = "Cola: " .. #autoBuyCarQueue .. " autos"
+
+    -- Paso 2: Ejecución
     if currentMode ~= "BUY_REPAIR" or isRepairRunning or isAutoBuyCarBuying then return end
-    if #autoBuyCarQueue > 0 then isAutoBuyCarBuying = true; local nextCar = table.remove(autoBuyCarQueue, 1); task.spawn(buyCar, nextCar) end
+
+    if #autoBuyCarQueue > 0 then
+        isAutoBuyCarBuying = true
+        local nextCar = table.remove(autoBuyCarQueue, 1)
+        print("QUEUE: Procesando siguiente auto: " .. nextCar.Name)
+        task.spawn(buyCar, nextCar)
+    end
 end
 
 buyCar = function(carModel)
@@ -163,12 +185,12 @@ buyCar = function(carModel)
 end
 
 -- ==============================================================================
--- LOGICA DE REPARACION (V4.22 - VALUES FOLDER SEARCH)
+-- LOGICA DE REPARACION (V4.23 - COMPLETA)
 -- ==============================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY_REPAIR" and not isRepairRunning then return end
     task.wait(1)
-    RepairStatusLabel.Text = "REPAIR: V4.22..."
+    RepairStatusLabel.Text = "REPAIR: V4.23..."
 
     local character = player.Character
     local rootPart = character:WaitForChild("HumanoidRootPart")
@@ -221,12 +243,11 @@ startAutoRepair = function()
     local carPartsEvent = carModel:FindFirstChild("PartsEvent")
     local engineBay = carModel:FindFirstChild("Body", true) and carModel:FindFirstChild("Body", true):FindFirstChild("EngineBay", true)
     
-    -- >>> CLAVE V4.22: CARGAMOS LA CARPETA 'VALUES' CORRECTAMENTE <<<
     local carValuesFolder = carModel:FindFirstChild("Values", true) and carModel:FindFirstChild("Values", true):FindFirstChild("Engine", true)
-    local carEngineData = carValuesFolder -- Alias para claridad
+    local carEngineData = carValuesFolder 
 
     if not carPartsEvent or not engineBay or not carValuesFolder then 
-        print("ERROR: No se encontraron las carpetas Body o Values del auto.")
+        print("ERROR: Datos del auto incompletos.")
         isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return 
     end
 
@@ -237,29 +258,18 @@ startAutoRepair = function()
     
     local engineType = carEngineData:FindFirstChild("EngineBlock") and carEngineData.EngineBlock.Value or ""
 
-    print("Analizando motor: " .. engineType)
-
     for _, partModel in ipairs(engineBay:GetChildren()) do
         if partModel:IsA("Model") and partModel:FindFirstChild("Main") then
             local fullPartName = partModel.Name 
             local basePartName = fullPartName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
             
-            -- >>> DETECCIÓN V4.22: Buscamos en la carpeta VALUES, no en el modelo físico <<<
             local droppedName = basePartName 
             
-            -- Buscamos el StringValue correspondiente en carValuesFolder
+            -- Lectura desde carpeta VALUES
             local valueObj = carValuesFolder:FindFirstChild(basePartName)
-            
             if valueObj and valueObj:IsA("StringValue") then
-                -- Leemos: "Transmission|6-Speed Manual"
                 local splitVal = string.split(valueObj.Value, "|")
-                if #splitVal >= 2 then
-                    droppedName = splitVal[2] -- "6-Speed Manual"
-                    print("   [VALUES] Mapeado: " .. basePartName .. " -> " .. droppedName)
-                end
-            else
-                -- Si no existe en Values con nombre exacto, intentamos limpieza extra o fallback
-                print("   [VALUES] No se encontró StringValue para: " .. basePartName)
+                if #splitVal >= 2 then droppedName = splitVal[2] end
             end
             
             droppedPartNameMap[fullPartName] = droppedName
@@ -274,7 +284,6 @@ startAutoRepair = function()
         end
     end
     
-    -- DESMONTAJE
     for _, partName in ipairs(allPartNames) do 
         if not isRepairRunning then break end
         pcall(function() carPartsEvent:FireServer("RemovePart", partName) end)
@@ -416,13 +425,17 @@ displayMessageEvent.OnClientEvent:Connect(function(...)
     local args = {...}
     local text = args[2]
     if not text or type(text) ~= "string" then return end
+    -- V4.23: Ignoramos el porcentaje, solo chequeamos que sea un mensaje de auto
     local percent = text:match("(%d+)%%")
     local model = text:match("([%w%s]+) has appeared") or text:match("([%w%s]+)%s*%d+%%")
-    if percent and model and tonumber(percent) <= MAX_PERCENT then
+    
+    if percent and model then
+        -- YA NO HAY IF percent <= MAX_PERCENT
         local lastCar = Workspace.Vehicles:GetChildren()[#Workspace.Vehicles:GetChildren()]
         if lastCar and lastCar:IsA("Model") and not table.find(autoBuyCarQueue, lastCar) then
-            AutoBuyCarInfoLabel.Text = "Junk: " .. model .. " (" .. percent .. "%)"
+            print("QUEUE: Auto detectado ("..model.."). Agregando a cola.")
             table.insert(autoBuyCarQueue, lastCar) 
+            AutoBuyCarInfoLabel.Text = "Cola: " .. #autoBuyCarQueue .. " autos"
             processBuyQueue()
         end
     end
@@ -434,4 +447,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.22 (VALUES FOLDER FIX) CARGADO ---")
+print("--- V4.23 (UNLIMITED) CARGADO ---")
