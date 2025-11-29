@@ -1,4 +1,4 @@
-print("--- CARGANDO MAQUINA DE ESTADO V4.18 (TEXT-MATCHING UI + TRANSMISSION FIX) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.19 (FIX: TRANSMISION & HOOD TIMING) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -35,24 +35,16 @@ local AUTOS_PARA_VENDER = {
 local VENDER_PROMPT = Workspace:WaitForChild("Map"):WaitForChild("SellCar"):WaitForChild("Prompt"):WaitForChild("ProximityPrompt")
 
 -- ==============================================================================
--- SISTEMA INTELIGENTE DE BOTONES UI (V4.18)
+-- BUSCADOR DE UI POR TEXTO EXACTO
 -- ==============================================================================
-
 local function findButtonByExactText(textToFind)
-    -- Buscamos el contenedor principal
     local topbar = playerGui:FindFirstChild("TopbarStandardClipped")
     local container = topbar and topbar:FindFirstChild("ClippedContainer")
+    if not container then return nil end
     
-    if not container then 
-        print("   [UI ERROR] No se encontró 'TopbarStandardClipped.ClippedContainer'")
-        return nil 
-    end
-    
-    -- Buscamos recursivamente cualquier TextLabel que coincida con el texto
     for _, descendant in ipairs(container:GetDescendants()) do
         if descendant:IsA("TextLabel") and descendant.Text == textToFind then
-            -- Encontramos el texto, devolvemos su PADRE (que es el botón 'Box')
-            return descendant.Parent
+            return descendant.Parent -- Devolvemos el contenedor clickeable
         end
     end
     return nil
@@ -60,12 +52,9 @@ end
 
 local function clickGUIButton(uiObject)
     if not uiObject then return false end
-    
-    -- Usamos VirtualInputManager para simular un click real del mouse
     local absPos = uiObject.AbsolutePosition
     local absSize = uiObject.AbsoluteSize
     local center = absPos + (absSize / 2)
-    
     VirtualInputManager:SendMouseButtonEvent(center.X, center.Y, 0, true, game, 1)
     task.wait(0.1)
     VirtualInputManager:SendMouseButtonEvent(center.X, center.Y, 0, false, game, 1)
@@ -73,135 +62,89 @@ local function clickGUIButton(uiObject)
 end
 
 -- ==============================================================================
--- GUI DE CONTROL
+-- GUI SETUP
 -- ==============================================================================
-
 local startAutoRepair
 local buyCar
 local startAutoSellLoop
 local processBuyQueue
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MasterControlGUI_V418"
+ScreenGui.Name = "MasterControlGUI_V419"
 ScreenGui.Parent = playerGui
 ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 250, 0, 280) 
-MainFrame.Position = UDim2.new(0.5, -125, 0, 100)
-MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
+MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "Máquina V4.18 (Final UI)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16;
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.19 (Fix Trans & Hood)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16;
 TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton")
-MasterToggleButton.Name = "MasterToggleButton"
-MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40)
-MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40)
-MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-MasterToggleButton.Text = "Sistema Total (OFF)"
-MasterToggleButton.Font = Enum.Font.SourceSansBold
-MasterToggleButton.TextSize = 18
-MasterToggleButton.Parent = MainFrame
+MasterToggleButton.Name = "MasterToggleButton"; MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
+MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255);
+MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
 
-local StatusMode = Instance.new("TextLabel")
-StatusMode.Name = "StatusMode"; StatusMode.Size = UDim2.new(0.9, 0, 0, 20); StatusMode.Position = UDim2.new(0.05, 0, 0, 90);
-StatusMode.Text = "MODO: OFF"; StatusMode.BackgroundTransparency = 1;
-StatusMode.TextColor3 = Color3.fromRGB(255, 255, 100); StatusMode.TextXAlignment = Enum.TextXAlignment.Left; StatusMode.Parent = MainFrame
+local StatusMode = Instance.new("TextLabel"); StatusMode.Name = "StatusMode"; StatusMode.Size = UDim2.new(0.9, 0, 0, 20); StatusMode.Position = UDim2.new(0.05, 0, 0, 90);
+StatusMode.Text = "MODO: OFF"; StatusMode.BackgroundTransparency = 1; StatusMode.TextColor3 = Color3.fromRGB(255, 255, 100); StatusMode.TextXAlignment = Enum.TextXAlignment.Left; StatusMode.Parent = MainFrame
 
-local AutoBuyCarInfoLabel = Instance.new("TextLabel")
-AutoBuyCarInfoLabel.Name = "InfoLabel"; AutoBuyCarInfoLabel.Size = UDim2.new(0.9, 0, 0, 40); AutoBuyCarInfoLabel.Position = UDim2.new(0.05, 0, 0, 115);
-AutoBuyCarInfoLabel.Text = "Último Junkyard: Esperando..."; AutoBuyCarInfoLabel.BackgroundTransparency = 1;
-AutoBuyCarInfoLabel.TextColor3 = Color3.fromRGB(150, 255, 255); AutoBuyCarInfoLabel.TextWrapped = true; AutoBuyCarInfoLabel.TextXAlignment = Enum.TextXAlignment.Left; AutoBuyCarInfoLabel.Parent = MainFrame
+local AutoBuyCarInfoLabel = Instance.new("TextLabel"); AutoBuyCarInfoLabel.Name = "InfoLabel"; AutoBuyCarInfoLabel.Size = UDim2.new(0.9, 0, 0, 40); AutoBuyCarInfoLabel.Position = UDim2.new(0.05, 0, 0, 115);
+AutoBuyCarInfoLabel.Text = "Esperando..."; AutoBuyCarInfoLabel.BackgroundTransparency = 1; AutoBuyCarInfoLabel.TextColor3 = Color3.fromRGB(150, 255, 255); AutoBuyCarInfoLabel.TextWrapped = true; AutoBuyCarInfoLabel.TextXAlignment = Enum.TextXAlignment.Left; AutoBuyCarInfoLabel.Parent = MainFrame
 
-local AutoBuyCarStatusLabel = Instance.new("TextLabel")
-AutoBuyCarStatusLabel.Name = "BuyStatus"; AutoBuyCarStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); AutoBuyCarStatusLabel.Position = UDim2.new(0.05, 0, 0, 160);
-AutoBuyCarStatusLabel.Text = "COMPRA: Inactiva"; AutoBuyCarStatusLabel.BackgroundTransparency = 1;
-AutoBuyCarStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); AutoBuyCarStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; AutoBuyCarStatusLabel.Parent = MainFrame
+local AutoBuyCarStatusLabel = Instance.new("TextLabel"); AutoBuyCarStatusLabel.Name = "BuyStatus"; AutoBuyCarStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); AutoBuyCarStatusLabel.Position = UDim2.new(0.05, 0, 0, 160);
+AutoBuyCarStatusLabel.Text = "COMPRA: Inactiva"; AutoBuyCarStatusLabel.BackgroundTransparency = 1; AutoBuyCarStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); AutoBuyCarStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; AutoBuyCarStatusLabel.Parent = MainFrame
 
-local RepairStatusLabel = Instance.new("TextLabel")
-RepairStatusLabel.Name = "RepairStatus"; RepairStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); RepairStatusLabel.Position = UDim2.new(0.05, 0, 0, 185);
-RepairStatusLabel.Text = "REPAIR: Inactivo"; RepairStatusLabel.BackgroundTransparency = 1;
-RepairStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); RepairStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; RepairStatusLabel.Parent = MainFrame
+local RepairStatusLabel = Instance.new("TextLabel"); RepairStatusLabel.Name = "RepairStatus"; RepairStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); RepairStatusLabel.Position = UDim2.new(0.05, 0, 0, 185);
+RepairStatusLabel.Text = "REPAIR: Inactivo"; RepairStatusLabel.BackgroundTransparency = 1; RepairStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); RepairStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; RepairStatusLabel.Parent = MainFrame
 
-local SellStatusLabel = Instance.new("TextLabel")
-SellStatusLabel.Name = "SellStatus"; SellStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); SellStatusLabel.Position = UDim2.new(0.05, 0, 0, 210);
-SellStatusLabel.Text = "VENTA: Inactiva"; SellStatusLabel.BackgroundTransparency = 1;
-SellStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); SellStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; SellStatusLabel.Parent = MainFrame
+local SellStatusLabel = Instance.new("TextLabel"); SellStatusLabel.Name = "SellStatus"; SellStatusLabel.Size = UDim2.new(0.9, 0, 0, 20); SellStatusLabel.Position = UDim2.new(0.05, 0, 0, 210);
+SellStatusLabel.Text = "VENTA: Inactiva"; SellStatusLabel.BackgroundTransparency = 1; SellStatusLabel.TextColor3 = Color3.fromRGB(255, 150, 150); SellStatusLabel.TextXAlignment = Enum.TextXAlignment.Left; SellStatusLabel.Parent = MainFrame
 
 -- Botón Manual de Basura
-local TrashManualButton = Instance.new("TextButton")
-TrashManualButton.Name = "TrashManualButton"
-TrashManualButton.Size = UDim2.new(0.2, 0, 0, 25)
-TrashManualButton.Position = UDim2.new(0.75, 0, 0, 245)
-TrashManualButton.BackgroundColor3 = Color3.fromRGB(100, 30, 30)
-TrashManualButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-TrashManualButton.Text = "🗑️"
-TrashManualButton.Parent = MainFrame
-local TrashLabel = Instance.new("TextLabel")
-TrashLabel.Text = "Borrar Suelo:"; TrashLabel.Size = UDim2.new(0.6, 0, 0, 25); TrashLabel.Position = UDim2.new(0.1, 0, 0, 245);
+local TrashManualButton = Instance.new("TextButton"); TrashManualButton.Name = "TrashManualButton"; TrashManualButton.Size = UDim2.new(0.2, 0, 0, 25); TrashManualButton.Position = UDim2.new(0.75, 0, 0, 245);
+TrashManualButton.BackgroundColor3 = Color3.fromRGB(100, 30, 30); TrashManualButton.TextColor3 = Color3.fromRGB(255, 255, 255); TrashManualButton.Text = "🗑️"; TrashManualButton.Parent = MainFrame
+local TrashLabel = Instance.new("TextLabel"); TrashLabel.Text = "Borrar Suelo:"; TrashLabel.Size = UDim2.new(0.6, 0, 0, 25); TrashLabel.Position = UDim2.new(0.1, 0, 0, 245);
 TrashLabel.BackgroundTransparency = 1; TrashLabel.TextColor3 = Color3.fromRGB(200, 200, 200); TrashLabel.TextXAlignment = Enum.TextXAlignment.Right; TrashLabel.Parent = MainFrame
 
--- CONEXIÓN DEL BOTÓN MANUAL DE BASURA
 TrashManualButton.MouseButton1Click:Connect(function()
-    print("GUI: Buscando botón 'Delete dropped parts'...")
     local deleteBtn = findButtonByExactText("Delete dropped parts")
-    
-    if deleteBtn then
-        print("GUI: ¡Botón encontrado! Ejecutando limpieza...")
-        clickGUIButton(deleteBtn)
-    else
-        print("GUI: ERROR - No se encontró el botón con texto 'Delete dropped parts'.")
-    end
+    if deleteBtn then clickGUIButton(deleteBtn) end
 end)
 
 local function updateGUI(mode)
     StatusMode.Text = "MODO: "..mode
     if mode == "BUY_REPAIR" then
-        MasterToggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        MasterToggleButton.Text = "Sistema Total (ON)"
-        StatusMode.TextColor3 = Color3.fromRGB(100, 255, 100)
+        MasterToggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0); MasterToggleButton.Text = "Sistema Total (ON)"
     elseif mode == "SELL" then
-        MasterToggleButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
-        MasterToggleButton.Text = "Sistema Total (VENDIENDO)"
+        MasterToggleButton.BackgroundColor3 = Color3.fromRGB(255, 150, 0); MasterToggleButton.Text = "Sistema Total (VENDIENDO)"
     elseif mode == "OFF" then
-        MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-        MasterToggleButton.Text = "Sistema Total (OFF)"
-        autoBuyCarQueue = {}
+        MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.Text = "Sistema Total (OFF)"
     end
 end
 updateGUI(currentMode)
 
--- INTERCEPTOR MAESTRO
 local function masterOnClientInvoke(text)
-    if currentMode == "BUY_REPAIR" then return true
-    elseif currentMode == "SELL" then return true end
+    if currentMode == "BUY_REPAIR" or currentMode == "SELL" then return true end
     if _G.Confirmation then return _G.Confirmation(text) end
     return false
 end
 if CONFIRM_REMOTE then CONFIRM_REMOTE.OnClientInvoke = masterOnClientInvoke end
 
--- DETECTOR DE LIMITE
 if NOTIFY_REMOTE then
     NOTIFY_REMOTE.OnClientEvent:Connect(function(text, color)
         if currentMode == "BUY_REPAIR" and text == "Garage limit reached" then
-            currentMode = "SELL"
-            updateGUI(currentMode)
+            currentMode = "SELL"; updateGUI(currentMode)
             if repairThread then task.cancel(repairThread); isRepairRunning = false end
             task.spawn(startAutoSellLoop)
         end
     end)
 end
 
--- LOGICA DE VENTA
 startAutoSellLoop = function()
     local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not rootPart then return end
-    print("--- MODO VENTA ACTIVADO ---")
     local garageFolder = playerData:WaitForChild("Garage")
     rootPart.CFrame = VENDEDOR_CFRAME
     task.wait(1) 
@@ -216,18 +159,14 @@ startAutoSellLoop = function()
             pcall(function() remoteLoad:InvokeServer(carData, targetCFrame) end)
             local carInWorld = Workspace.Vehicles:WaitForChild(carIDToSell, 5)
             if carInWorld then
-                carInWorld:PivotTo(targetCFrame)
-                task.wait(0.5)
-                pcall(fireproximityprompt, VENDER_PROMPT, 0)
-                task.wait(2.5) 
+                carInWorld:PivotTo(targetCFrame); task.wait(0.5)
+                pcall(fireproximityprompt, VENDER_PROMPT, 0); task.wait(2.5) 
             end
         end
     end
-    currentMode = "BUY_REPAIR"
-    processBuyQueue()
+    currentMode = "BUY_REPAIR"; processBuyQueue()
 end
 
--- LOGICA DE COMPRA
 processBuyQueue = function()
     if currentMode ~= "BUY_REPAIR" or isRepairRunning or isAutoBuyCarBuying then return end
     if #autoBuyCarQueue > 0 then
@@ -257,18 +196,19 @@ buyCar = function(carModel)
     end
 end
 
--- LOGICA DE REPARACION (V4.18)
+-- ==============================================================================
+-- LOGICA DE REPARACION (V4.19 FIXES)
+-- ==============================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY_REPAIR" and not isRepairRunning then return end
     task.wait(3)
-    RepairStatusLabel.Text = "REPAIR: V4.18 Iniciando..."
+    RepairStatusLabel.Text = "REPAIR: V4.19..."
 
     local character = player.Character
     local rootPart = character:WaitForChild("HumanoidRootPart")
     local humanoid = character:FindFirstChild("Humanoid")
     if humanoid then humanoid.Sit = false; humanoid.Jump = true end
 
-    -- MAPA DE MAQUINAS V4.18 (Transmisión incluida)
     local machineMap = {
         ["Battery"] = "BatteryCharger",
         ["AirIntake"] = "PartsWasher",
@@ -278,7 +218,7 @@ startAutoRepair = function()
         ["ExhaustManifold"] = "GrindingMachine",
         ["Suspension"] = "GrindingMachine",
         ["Alternator"] = "GrindingMachine",
-        ["Transmission"] = "GrindingMachine" -- Confirmado por usuario
+        ["Transmission"] = "GrindingMachine" -- Confirmado
     }
 
     local function getPitStop()
@@ -307,23 +247,26 @@ startAutoRepair = function()
     local pitStop = getPitStop()
     local carModel = findClosestCar()
     
-    if not pitStop or not carModel then 
-        isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return 
-    end
+    if not pitStop or not carModel then isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return end
 
     local carPartsEvent = carModel:FindFirstChild("PartsEvent")
     local engineBay = carModel:FindFirstChild("Body", true) and carModel:FindFirstChild("Body", true):FindFirstChild("EngineBay", true)
     local carData = carModel:FindFirstChild("Values", true) and carModel:FindFirstChild("Values", true):FindFirstChild("Engine", true)
 
-    if not carPartsEvent or not engineBay then
-        isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return
-    end
+    if not carPartsEvent or not engineBay then isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return end
 
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1)
 
+    -- >>> ABRIR CAPO (CON ESPERA SOLICITADA) <<<
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true):FindFirstChild("ClickDetector")
-    if hoodCD then fireclickdetector(hoodCD); task.wait(1.5) end
+    if hoodCD then 
+        fireclickdetector(hoodCD)
+        print("REPAIR: Capó abierto. Esperando 2 segundos para realismo...")
+        task.wait(2) -- AQUI ESTA LA ESPERA QUE PEDISTE
+    else
+        print("REPAIR: No se encontró capó o ya estaba abierto.")
+    end
 
     local allPartNames = {}
     local partsToRepair_Names = {}
@@ -334,14 +277,19 @@ startAutoRepair = function()
     for _, partModel in ipairs(engineBay:GetChildren()) do
         if partModel:IsA("Model") and partModel:FindFirstChild("Main") then
             local fullPartName = partModel.Name 
+            
+            -- Limpieza de nombre
             local basePartName = fullPartName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
             
+            -- FIX: Si es transmisión, forzamos el nombre base a "Transmission" para que coincida con el mapa
+            if basePartName:find("Transmission") then basePartName = "Transmission" end
+
             table.insert(allPartNames, fullPartName) 
             
             if machineMap[basePartName] then
+                print("   [SCAN] Reparable detectado: "..fullPartName.." (Base: "..basePartName..")")
                 table.insert(partsToRepair_Names, fullPartName)
             else
-                -- Solo piezas que NO están en machineMap se compran nuevas
                 local partString = "ENGINE|" .. engineType .. "|" .. basePartName
                 table.insert(partsToBuy_Data, partString)
             end
@@ -355,17 +303,12 @@ startAutoRepair = function()
         task.wait(0.1) 
     end
 
-    -- >>> AUTOMATIZACIÓN: CLICK 'BRING DROPPED PARTS' <<<
-    task.wait(1)
+    task.wait(1.5) -- Esperar a que caigan
     local bringBtn = findButtonByExactText("Bring dropped parts")
     if bringBtn then
-        print("BOT: Texto 'Bring dropped parts' encontrado. Click automático...")
         clickGUIButton(bringBtn)
-    else
-        print("BOT: Advertencia - No se encontró botón 'Bring'.")
-        task.wait(3) -- Fallback (gravedad)
+        task.wait(2) -- Esperar a que lleguen las piezas tras presionar el botón
     end
-    task.wait(1) 
     
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     local shopFolder = Workspace:WaitForChild("PartsStore"):WaitForChild("SpareParts"):WaitForChild("Parts")
@@ -400,11 +343,19 @@ startAutoRepair = function()
         local partsBeingRepaired = {} 
         for _, partName in ipairs(partsToRepair_Names) do
             if not isRepairRunning then break end 
+            
+            -- FIX: Intentamos encontrar la pieza. Si es transmission, buscamos fuzzy
             local partObject = moveablePartsFolder:FindFirstChild(partName)
+            if not partObject and partName:find("Transmission") then
+                 partObject = moveablePartsFolder:FindFirstChild("Transmission") -- Nombre corto
+            end
+
             if partObject then
                 local wear = partObject:GetAttribute("Wear") or 0
                 if wear > 0 then
                     local basePartName = partName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
+                    if basePartName:find("Transmission") then basePartName = "Transmission" end
+
                     local machineName = machineMap[basePartName]
                     local pool = machinePools[machineName]
                     if pool and #pool > 0 then
@@ -448,18 +399,33 @@ startAutoRepair = function()
     while not (buy_done and repair_done) and isRepairRunning do task.wait(0.5) end
     if not isRepairRunning then return end
 
+    -- >>> REINSTALACION (CON FIX TRANSMISION) <<<
     for _, partName in ipairs(allPartNames) do
         if not isRepairRunning then break end 
         local targetName = universalPartNameMap[partName] or partName
         local partToInstall = nil
+        
+        -- Buscamos pieza con 0 wear
         for _, p in ipairs(moveablePartsFolder:GetChildren()) do
-            if p.Name == targetName and (p:GetAttribute("Wear") or 0) == 0 then
-                partToInstall = p; break
+            local wear = p:GetAttribute("Wear") or 0
+            if wear == 0 then
+                -- Coincidencia exacta
+                if p.Name == targetName then
+                    partToInstall = p
+                    break
+                -- FIX: Coincidencia aproximada para Transmisión
+                elseif partName:find("Transmission") and p.Name == "Transmission" then
+                    partToInstall = p
+                    break
+                end
             end
         end
+
         if partToInstall then
             pcall(function() carPartsEvent:FireServer("ReapplyPart", partToInstall, partName) end)
             task.wait(0.15)
+        else
+            print("REPAIR: Advertencia - No se encontró pieza reparada/nueva para: "..partName)
         end
     end
 
@@ -507,4 +473,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.18 (FINAL) Cargado ---")
+print("--- V4.19 (TRANSMISSION & HOOD FIX) CARGADO ---")
