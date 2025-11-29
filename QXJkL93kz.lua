@@ -1,4 +1,4 @@
-print("--- CARGANDO MAQUINA DE ESTADO V4.23 (UNLIMITED BUY & SMART QUEUE) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.25 (LAZY LOAD SELL FIX) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -23,14 +23,15 @@ local repairThread = nil
 local isAutoBuyCarBuying = false
 local autoBuyCarQueue = {} 
 
--- YA NO HAY LIMITE DE PORCENTAJE (Compra todo)
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
 local AUTOS_PARA_VENDER = {
     "Merquis C203", "Matsu Lanca", "Lokswag Golo GT", "BNV K5 e39",
     "Four Traffic", "Lokswag Golo MK5", "Toyoda Hellox", "Holde Inteiro",
     "Leskus not200", "BNV K3", "Missah Silva"
 }
-local VENDER_PROMPT = Workspace:WaitForChild("Map"):WaitForChild("SellCar"):WaitForChild("Prompt"):WaitForChild("ProximityPrompt")
+
+-- NOTA: Eliminamos la variable VENDER_PROMPT de aquí para evitar el error "Infinite yield".
+-- La buscaremos dinámicamente cuando estemos frente al vendedor.
 
 -- ==============================================================================
 -- UTILIDADES UI
@@ -66,12 +67,12 @@ local buyCar
 local startAutoSellLoop
 local processBuyQueue
 
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V423"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V425"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.23 (Unlimited Buy)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.25 (Lazy Load Sell)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Name = "MasterToggleButton"; MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -109,8 +110,34 @@ startAutoSellLoop = function()
     local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not rootPart then return end
     local garageFolder = playerData:WaitForChild("Garage")
+    
+    print("VENTA: Teletransportando al vendedor...")
     rootPart.CFrame = VENDEDOR_CFRAME
-    task.wait(1) 
+    task.wait(1.5) -- Esperar a que cargue el mapa al llegar
+    
+    -- >>> V4.25: BÚSQUEDA SEGURA DEL PROMPT <<<
+    -- Buscamos el Prompt SOLO cuando ya estamos aquí.
+    -- Usamos la ruta que tú me diste: Workspace.Map.SellCar.Prompt.ProximityPrompt
+    local promptVenta = nil
+    
+    local map = Workspace:FindFirstChild("Map")
+    local sellCar = map and map:FindFirstChild("SellCar")
+    local promptFolder = sellCar and sellCar:FindFirstChild("Prompt")
+    
+    if promptFolder then
+        promptVenta = promptFolder:FindFirstChild("ProximityPrompt")
+    end
+    
+    if not promptVenta then
+        print("WARN: No se encontró Prompt en ruta exacta. Intentando búsqueda recursiva...")
+        if sellCar then promptVenta = sellCar:FindFirstChildWhichIsA("ProximityPrompt", true) end
+    end
+    
+    if not promptVenta then
+        print("ERROR CRITICO: No se puede vender. Prompt no encontrado.")
+    end
+    -- >>> FIN BÚSQUEDA <<<
+
     for _, carData in ipairs(garageFolder:GetChildren()) do
         if currentMode ~= "SELL" then break end 
         local modelName = carData:FindFirstChild("Model") and carData.Model.Value
@@ -122,39 +149,29 @@ startAutoSellLoop = function()
             pcall(function() remoteLoad:InvokeServer(carData, targetCFrame) end)
             local carInWorld = Workspace.Vehicles:WaitForChild(carIDToSell, 5)
             if carInWorld then
-                carInWorld:PivotTo(targetCFrame); task.wait(0.5); pcall(fireproximityprompt, VENDER_PROMPT, 0); task.wait(2.5) 
+                carInWorld:PivotTo(targetCFrame); task.wait(0.5); 
+                
+                if promptVenta then
+                    print("VENTA: Disparando Prompt...")
+                    pcall(fireproximityprompt, promptVenta, 0)
+                end
+                task.wait(2.5) 
             end
         end
     end
     currentMode = "BUY_REPAIR"; processBuyQueue()
 end
 
--- >>> COLA INTELIGENTE V4.23 <<<
 processBuyQueue = function()
-    -- Paso 1: Limpieza de Fantasmas
-    -- Revisamos la cola desde el principio. Si el primer auto ya no existe (Parent nil), lo borramos y revisamos el siguiente.
     while #autoBuyCarQueue > 0 do
         local checkCar = autoBuyCarQueue[1]
-        if checkCar and checkCar.Parent and checkCar:FindFirstChild("ClickDetector", true) then
-            -- El auto existe y tiene click detector. Es válido.
-            break 
-        else
-            -- El auto desapareció o ya no es válido
-            print("QUEUE: Auto en cola desapareció (Despawn). Eliminando de la lista...")
-            table.remove(autoBuyCarQueue, 1)
-        end
+        if checkCar and checkCar.Parent and checkCar:FindFirstChild("ClickDetector", true) then break 
+        else table.remove(autoBuyCarQueue, 1) end
     end
-    
     AutoBuyCarInfoLabel.Text = "Cola: " .. #autoBuyCarQueue .. " autos"
-
-    -- Paso 2: Ejecución
     if currentMode ~= "BUY_REPAIR" or isRepairRunning or isAutoBuyCarBuying then return end
-
     if #autoBuyCarQueue > 0 then
-        isAutoBuyCarBuying = true
-        local nextCar = table.remove(autoBuyCarQueue, 1)
-        print("QUEUE: Procesando siguiente auto: " .. nextCar.Name)
-        task.spawn(buyCar, nextCar)
+        isAutoBuyCarBuying = true; local nextCar = table.remove(autoBuyCarQueue, 1); task.spawn(buyCar, nextCar)
     end
 end
 
@@ -171,26 +188,22 @@ buyCar = function(carModel)
     task.wait(0.5) 
     
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true) and carModel:FindFirstChild("Misc", true):FindFirstChild("Hood", true):FindFirstChild("Detector", true):FindFirstChild("ClickDetector")
-    if hoodCD then
-        fireclickdetector(hoodCD)
-        task.wait(1.5) 
-    end
+    if hoodCD then fireclickdetector(hoodCD); task.wait(1.5) end
 
     if currentMode == "BUY_REPAIR" then
-        isRepairRunning = true
-        repairThread = task.spawn(startAutoRepair)
+        isRepairRunning = true; repairThread = task.spawn(startAutoRepair)
     else
         isRepairRunning = false; isAutoBuyCarBuying = false 
     end
 end
 
 -- ==============================================================================
--- LOGICA DE REPARACION (V4.23 - COMPLETA)
+-- LOGICA DE REPARACION
 -- ==============================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY_REPAIR" and not isRepairRunning then return end
     task.wait(1)
-    RepairStatusLabel.Text = "REPAIR: V4.23..."
+    RepairStatusLabel.Text = "REPAIR: V4.25..."
 
     local character = player.Character
     local rootPart = character:WaitForChild("HumanoidRootPart")
@@ -198,15 +211,9 @@ startAutoRepair = function()
     if humanoid then humanoid.Sit = false; humanoid.Jump = true end
 
     local machineMap = {
-        ["Battery"] = "BatteryCharger",
-        ["AirIntake"] = "PartsWasher",
-        ["Radiator"] = "PartsWasher",
-        ["CylinderHead"] = "GrindingMachine",
-        ["EngineBlock"] = "GrindingMachine",
-        ["ExhaustManifold"] = "GrindingMachine",
-        ["Suspension"] = "GrindingMachine",
-        ["Alternator"] = "GrindingMachine",
-        ["Transmission"] = "GrindingMachine"
+        ["Battery"] = "BatteryCharger", ["AirIntake"] = "PartsWasher", ["Radiator"] = "PartsWasher",
+        ["CylinderHead"] = "GrindingMachine", ["EngineBlock"] = "GrindingMachine", ["ExhaustManifold"] = "GrindingMachine",
+        ["Suspension"] = "GrindingMachine", ["Alternator"] = "GrindingMachine", ["Transmission"] = "GrindingMachine"
     }
 
     local function getPitStop()
@@ -242,12 +249,9 @@ startAutoRepair = function()
 
     local carPartsEvent = carModel:FindFirstChild("PartsEvent")
     local engineBay = carModel:FindFirstChild("Body", true) and carModel:FindFirstChild("Body", true):FindFirstChild("EngineBay", true)
-    
     local carValuesFolder = carModel:FindFirstChild("Values", true) and carModel:FindFirstChild("Values", true):FindFirstChild("Engine", true)
-    local carEngineData = carValuesFolder 
-
+    
     if not carPartsEvent or not engineBay or not carValuesFolder then 
-        print("ERROR: Datos del auto incompletos.")
         isRepairRunning = false; isAutoBuyCarBuying = false; processBuyQueue(); return 
     end
 
@@ -255,17 +259,14 @@ startAutoRepair = function()
     local partsToRepair_Names = {} 
     local partsToBuy_Data = {} 
     local droppedPartNameMap = {} 
-    
-    local engineType = carEngineData:FindFirstChild("EngineBlock") and carEngineData.EngineBlock.Value or ""
+    local engineType = carValuesFolder:FindFirstChild("EngineBlock") and carValuesFolder.EngineBlock.Value or ""
 
     for _, partModel in ipairs(engineBay:GetChildren()) do
         if partModel:IsA("Model") and partModel:FindFirstChild("Main") then
             local fullPartName = partModel.Name 
             local basePartName = fullPartName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
-            
             local droppedName = basePartName 
             
-            -- Lectura desde carpeta VALUES
             local valueObj = carValuesFolder:FindFirstChild(basePartName)
             if valueObj and valueObj:IsA("StringValue") then
                 local splitVal = string.split(valueObj.Value, "|")
@@ -413,10 +414,8 @@ startAutoRepair = function()
     end
     
     if isRepairRunning then
-        isRepairRunning = false
-        RepairStatusLabel.Text = "REPAIR: Listo"
-        isAutoBuyCarBuying = false 
-        processBuyQueue()
+        isRepairRunning = false; RepairStatusLabel.Text = "REPAIR: Listo"
+        isAutoBuyCarBuying = false; processBuyQueue()
     end
 end
 
@@ -425,12 +424,9 @@ displayMessageEvent.OnClientEvent:Connect(function(...)
     local args = {...}
     local text = args[2]
     if not text or type(text) ~= "string" then return end
-    -- V4.23: Ignoramos el porcentaje, solo chequeamos que sea un mensaje de auto
     local percent = text:match("(%d+)%%")
     local model = text:match("([%w%s]+) has appeared") or text:match("([%w%s]+)%s*%d+%%")
-    
     if percent and model then
-        -- YA NO HAY IF percent <= MAX_PERCENT
         local lastCar = Workspace.Vehicles:GetChildren()[#Workspace.Vehicles:GetChildren()]
         if lastCar and lastCar:IsA("Model") and not table.find(autoBuyCarQueue, lastCar) then
             print("QUEUE: Auto detectado ("..model.."). Agregando a cola.")
@@ -447,4 +443,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.23 (UNLIMITED) CARGADO ---")
+print("--- V4.25 (LAZY LOAD) CARGADO ---")
