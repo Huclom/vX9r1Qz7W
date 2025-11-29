@@ -1,8 +1,8 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V4.44): "HOOD DEBUGGER" ---
--- --- FIX: Tiempos de espera extendidos para ver abrir el capó ---
+-- --- SCRIPT MAESTRO (V4.45): "EL BLOQUEO DE TRANSICIÓN" ---
+-- --- FIX: Evita comprar a lo loco cuando el auto respawnea ---
 -- =================================================================
-print("--- CARGANDO MAQUINA DE ESTADO V4.44 (HOOD TIMING FIX) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.45 (RESPAWN LOCK FIX) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -25,7 +25,7 @@ local VEHICLES_FOLDER = Workspace:WaitForChild("Vehicles", 10)
 local currentMode = "OFF"
 local isAutoBuyCarBuying = false 
 local autoBuyCarQueue = {} 
-local isRepairRunning = false 
+local isRepairRunning = false -- Este es el semáforo principal
 local FAIL_DELAY = 5 
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
 
@@ -35,7 +35,7 @@ local AUTOS_PARA_VENDER = {
     "Leskus not200", "BNV K3", "Missah Silva", "Siath Lion", "Fia-Te Ponto",
     "Peujo 200e6", "Ontel Costa", "Lokswag Golo", "Renas Kapturado", "Sacode Oitava",
     "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao", "Auidy V5",
-    "Sabes Muito", "Xitro J3", "Toyoda Yapp"
+    "Toyoda Yapp", "Xitro J3", "Sabes Muito"
 }
 
 -- --- UTILIDADES UI ---
@@ -69,12 +69,12 @@ local startAutoRepair
 local buyCar
 
 -- --- INTERFAZ GRÁFICA (GUI) ---
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V444"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V445"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.44 (Hood Timing Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.45 (Respawn Lock)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -174,25 +174,56 @@ startAutoSellLoop = function()
 end
 
 -- =================================================================
--- LOGICA DE REPARACIÓN (V4.44)
+-- LOGICA DE REPARACIÓN (V4.45)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
-    isRepairRunning = true
+    
+    -- >>> V4.45 FIX: BÚSQUEDA DE AUTO PROPIO (Si el chatarra desapareció) <<<
+    local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    -- Intentamos encontrar el auto que acabamos de comprar (El que tiene Owner = Yo)
+    local targetCar = nil
+    print("REPAIR: Buscando auto propio cercano...")
+    
+    for i = 1, 10 do -- 5 segundos de búsqueda (0.5s * 10)
+        local closest = nil
+        local minDst = 20 -- Radio máximo de 20 studs
+        
+        for _, car in ipairs(Workspace:WaitForChild("Vehicles"):GetChildren()) do
+            if car:IsA("Model") and car:GetAttribute("Owner") == player.Name then
+                local pivot = car:GetPivot().Position
+                local dist = (rootPart.Position - pivot).Magnitude
+                if dist < minDst then
+                    minDst = dist
+                    closest = car
+                end
+            end
+        end
+        
+        if closest then
+            targetCar = closest
+            print("REPAIR: ¡Auto propio encontrado! ("..closest.Name..")")
+            break
+        end
+        task.wait(0.5)
+    end
+    
+    if not targetCar then
+        print("REPAIR: No se encontró auto propio. Abortando reparación.")
+        isRepairRunning = false -- Importante: Liberar el bloqueo si falla
+        return
+    end
+    -- >>> FIN BÚSQUEDA <<<
+
+    isRepairRunning = true -- ACTIVAMOS EL SEMÁFORO ROJO PARA EL COMPRADOR
     task.wait(1)
     RepairStatusLabel.Text = "REPAIR: Iniciando..."
 
-    local character = player.Character
-    local rootPart = character:WaitForChild("HumanoidRootPart")
-    local humanoid = character:FindFirstChild("Humanoid")
-    if humanoid then humanoid.Sit = false; humanoid.Jump = true end
-
-    local machineMap = {
-        ["Battery"] = "BatteryCharger", ["AirIntake"] = "PartsWasher", ["Radiator"] = "PartsWasher",
-        ["CylinderHead"] = "GrindingMachine", ["EngineBlock"] = "GrindingMachine", ["ExhaustManifold"] = "GrindingMachine",
-        ["Suspension"] = "GrindingMachine", ["Alternator"] = "GrindingMachine", ["Transmission"] = "GrindingMachine"
-    }
-
+    local carModel = targetCar -- Usamos el auto encontrado
+    
+    -- TP AL TALLER
     local function getPitStop()
         local map = Workspace:WaitForChild("Map")
         local pitStopPosition = Vector3.new(-981.30127, 18.0568581, -129.036621)
@@ -205,23 +236,9 @@ startAutoRepair = function()
         end; return closest
     end
     
-    local function findClosestCar()
-        local vehiclesFolder = Workspace:WaitForChild("Vehicles")
-        local closest = nil; local minDst = math.huge
-        for _, car in ipairs(vehiclesFolder:GetChildren()) do
-            if car:IsA("Model") and car:GetAttribute("Owner") == player.Name then
-                local dist = (rootPart.Position - car:GetPivot().Position).Magnitude
-                if dist < minDst then minDst = dist; closest = car end
-            end
-        end; return closest
-    end 
-
     local pitStop = getPitStop()
-    local carModel = findClosestCar()
+    if not pitStop then isRepairRunning = false; return end
     
-    if not pitStop or not carModel then isRepairRunning = false; return end
-    
-    -- TP AL TALLER
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1)
 
@@ -230,25 +247,16 @@ startAutoRepair = function()
     local existingParts = moveablePartsFolder:GetChildren()
     
     if #existingParts > 0 then
-        print("REPAIR: Detectada basura ("..#existingParts.."). Iniciando limpieza completa...")
-        RepairStatusLabel.Text = "REPAIR: Agrupando basura..."
-        
+        print("REPAIR: Detectada basura. Limpiando...")
         local bringBtn = findButtonByExactText("Bring dropped parts")
-        if bringBtn then
-            clickGUIButton(bringBtn)
-            task.wait(1.5)
-        end
+        if bringBtn then clickGUIButton(bringBtn); task.wait(1.5) end
 
         local deleteBtn = findButtonByExactText("Delete dropped parts")
         if deleteBtn then
             clickGUIButton(deleteBtn)
-            RepairStatusLabel.Text = "REPAIR: Borrando (Espera Smart)..."
-            
+            RepairStatusLabel.Text = "REPAIR: Borrando..."
             for i = 1, 8 do
-                if #moveablePartsFolder:GetChildren() == 0 then
-                    print("REPAIR: ¡Limpieza completada en "..i.."s!")
-                    break
-                end
+                if #moveablePartsFolder:GetChildren() == 0 then break end
                 task.wait(1)
             end
         end
@@ -262,27 +270,25 @@ startAutoRepair = function()
     
     if not carPartsEvent or not engineBay or not carValuesFolder then isRepairRunning = false; return end
 
-    local allPartNames = {}
-    local partsToRepair_Names = {} 
-    local partsToBuy_Data = {} 
-    local droppedPartNameMap = {} 
+    -- ... [Resto de la lógica de reparación igual que V4.44] ...
+    -- (Por brevedad, mantenemos el código de reparación que ya funcionaba)
+    
+    local allPartNames = {}; local partsToRepair_Names = {}; local partsToBuy_Data = {}; local droppedPartNameMap = {}
     local engineType = carValuesFolder:FindFirstChild("EngineBlock") and carValuesFolder.EngineBlock.Value or ""
+    local machineMap = {["Battery"]="BatteryCharger", ["AirIntake"]="PartsWasher", ["Radiator"]="PartsWasher", ["CylinderHead"]="GrindingMachine", ["EngineBlock"]="GrindingMachine", ["ExhaustManifold"]="GrindingMachine", ["Suspension"]="GrindingMachine", ["Alternator"]="GrindingMachine", ["Transmission"]="GrindingMachine"}
 
     for _, partModel in ipairs(engineBay:GetChildren()) do
         if partModel:IsA("Model") and partModel:FindFirstChild("Main") then
             local fullPartName = partModel.Name 
             local basePartName = fullPartName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
             local droppedName = basePartName 
-            
             local valueObj = carValuesFolder:FindFirstChild(basePartName)
             if valueObj and valueObj:IsA("StringValue") then
                 local splitVal = string.split(valueObj.Value, "|")
                 if #splitVal >= 2 then droppedName = splitVal[2] end
             end
-            
             droppedPartNameMap[fullPartName] = droppedName
             table.insert(allPartNames, fullPartName) 
-            
             if machineMap[basePartName] or basePartName:find("Transmission") then
                 table.insert(partsToRepair_Names, fullPartName)
             else
@@ -301,7 +307,6 @@ startAutoRepair = function()
     task.wait(1.5) 
     local bringBtn = findButtonByExactText("Bring dropped parts")
     if bringBtn then clickGUIButton(bringBtn); task.wait(2) end
-    
     local shopFolder = Workspace:WaitForChild("PartsStore"):WaitForChild("SpareParts"):WaitForChild("Parts")
 
     local function do_parallel_buy()
@@ -334,16 +339,13 @@ startAutoRepair = function()
         local partsBeingRepaired = {} 
         for _, partSlotName in ipairs(partsToRepair_Names) do
             if not isRepairRunning then break end 
-            
             local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
             local partObject = moveablePartsFolder:FindFirstChild(targetDroppedName)
-            
             if partObject then
                 local wear = partObject:GetAttribute("Wear") or 0
                 if wear > 0 then
                     local basePartName = partSlotName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
                     if basePartName:find("Transmission") then basePartName = "Transmission" end
-
                     local machineName = machineMap[basePartName]
                     local pool = machinePools[machineName]
                     if pool and #pool > 0 then
@@ -361,14 +363,12 @@ startAutoRepair = function()
                 end
             end
         end 
-
         while #partsBeingRepaired > 0 and isRepairRunning do 
             task.wait(0.5) 
             for i = #partsBeingRepaired, 1, -1 do 
                 local data = partsBeingRepaired[i]
                 local wear = data.Part:GetAttribute("Wear") or 0
-                if wear == 0 then
-                    table.remove(partsBeingRepaired, i)
+                if wear == 0 then table.remove(partsBeingRepaired, i)
                 elseif (os.clock() - data.StartTime) > 20 then
                     data.StartTime = os.clock()
                     local detectorPad = data.Machine:FindFirstChild("Detector", true)
@@ -390,7 +390,6 @@ startAutoRepair = function()
         if not isRepairRunning then break end 
         local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
         local partToInstall = nil
-        
         for _, p in ipairs(moveablePartsFolder:GetChildren()) do
             local wear = p:GetAttribute("Wear") or 0
             if wear == 0 and p.Name == targetDroppedName then
@@ -403,9 +402,6 @@ startAutoRepair = function()
         end
     end
 
-    -- NO CERRAMOS CAPO AQUI, YA DEBERIA ESTAR ABIERTO
-    -- SOLO ASEGURAR QUE ESTE CERRADO AL FINAL SI SE QUIERE (Opcional)
-    
     local carSeat = carModel:FindFirstChild("DriveSeat") or carModel:FindFirstChildOfClass("BasePart", true)
     if carSeat then rootPart.CFrame = carSeat.CFrame * CFrame.new(0, 3, 15); task.wait(1) end
 
@@ -417,11 +413,11 @@ startAutoRepair = function()
         task.wait(2)
     end
     
-    isRepairRunning = false
+    isRepairRunning = false -- ¡AHORA SÍ SE LIBERA EL SEMÁFORO!
     RepairStatusLabel.Text = "REPAIR: Terminado"
 end
 
--- --- 9. LOGICA COMPRA (V4.44 - HOOD DEBUG) ---
+-- --- 9. LOGICA COMPRA (V4.45 - STRICT LOCK) ---
 local function isCarInQueue(carModel)
     for _, item in ipairs(autoBuyCarQueue) do
         if item.car == carModel then return true end
@@ -450,6 +446,14 @@ end
 spawn(function()
     while true do
         task.wait(1)
+        
+        -- >>> V4.45 FIX: Bloqueo ESTRICTO si se está reparando <<<
+        if isRepairRunning then
+            AutoBuyCarStatusLabel.Text = "COMPRA: Esperando reparación..."
+            continue -- No comprar nada mientras reparamos
+        end
+        -- >>> FIN BLOQUEO <<<
+
         if currentMode ~= "BUY" or #autoBuyCarQueue == 0 or isAutoBuyCarBuying then continue end
 
         isAutoBuyCarBuying = true
@@ -472,52 +476,23 @@ spawn(function()
         task.wait(0.8)
         fireclickdetector(carToBuy.ClickDetector)
         
-        -- >>> ESPERA EXTENDIDA (V4.44) <<<
         AutoBuyCarStatusLabel.Text = "COMPRA: Verificando..."
-        task.wait(1.5) -- Espera más larga para que cargue el auto comprado
+        task.wait(2) -- Espera prudencial tras compra
         
-        if carToBuy and carToBuy.Parent then
-            -- Check de falla normal
-            if not carToBuy:FindFirstChild("Values") then -- Si no cargó la data, falló o es lag
-                 -- Podríamos añadir lógica de reintento aquí, pero por ahora asumimos falla si sigue ahí y no somos dueños
-            end
-        else
-             -- Si desaparece, falló
-             AutoBuyCarStatusLabel.Text = "COMPRA: Desapareció"
-             isAutoBuyCarBuying = false; continue
-        end
-
-        -- >>> INTENTO DE ABRIR CAPO (CON LOGS) <<<
-        print("COMPRA: Buscando capó...")
-        AutoBuyCarStatusLabel.Text = "COMPRA: Abriendo Capó..."
-        
-        local hoodPart = carToBuy:FindFirstChild("Misc") 
-            and carToBuy.Misc:FindFirstChild("Hood") 
-            and carToBuy.Misc.Hood:FindFirstChild("Detector")
-            and carToBuy.Misc.Hood.Detector:FindFirstChild("ClickDetector")
-            
+        local hoodPart = carToBuy:FindFirstChild("Misc") and carToBuy.Misc:FindFirstChild("Hood") and carToBuy.Misc.Hood:FindFirstChild("Detector") and carToBuy.Misc.Hood.Detector:FindFirstChild("ClickDetector")
         if hoodPart then
             fireclickdetector(hoodPart)
-            print(">>> [CAPO] ¡ABIERTO EXITOSAMENTE! Esperando animación...")
-            task.wait(3) -- 3 SEGUNDOS PARA VERLO
-        else
-            print(">>> [CAPO] Falló: No se encontró la carpeta 'Misc.Hood.Detector'")
-            -- Intentamos búsqueda recursiva por si acaso
-            local anyCD = carToBuy:FindFirstChild("Hood", true)
-            if anyCD then
-                 local cd = anyCD:FindFirstChildWhichIsA("ClickDetector", true)
-                 if cd then fireclickdetector(cd); task.wait(3) end
-            end
+            task.wait(3) 
         end
 
-        AutoBuyCarStatusLabel.Text = "COMPRA: ¡Éxito!"
-        
+        -- Si llegamos aquí, el auto probablemente desapareció (éxito) o sigue ahí (fallo)
+        -- En cualquier caso, llamamos a repair. Repair V4.45 verificará si hay auto propio.
         if currentMode == "BUY" then
             startAutoRepair()
         end
         
         isAutoBuyCarBuying = false
-        if currentMode == "BUY" and #autoBuyCarQueue == 0 then
+        if currentMode == "BUY" and #autoBuyCarQueue == 0 and not isRepairRunning then
             task.spawn(scanExistingCars)
         end
     end
@@ -560,4 +535,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.44 (HOOD TIMING FIX) LISTA ---")
+print("--- V4.45 (RESPAWN LOCK) LISTA ---")
