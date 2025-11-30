@@ -1,8 +1,8 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V4.43): "LA ASPIRADORA ORDENADA" ---
--- --- NUEVO: Traer piezas (Bring) ANTES de Borrar (Delete) ---
+-- --- SCRIPT MAESTRO (V4.46): "COMPRADOR INSISTENTE" ---
+-- --- FIX: Reintentos de compra si el primer click falla ---
 -- =================================================================
-print("--- CARGANDO MAQUINA DE ESTADO V4.43 (BRING THEN CLEAN) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.46 (BUY RETRY FIX) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -69,12 +69,12 @@ local startAutoRepair
 local buyCar
 
 -- --- INTERFAZ GRÁFICA (GUI) ---
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V443"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V446"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.43 (Bring -> Clean)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.46 (Buy Retry Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -174,16 +174,50 @@ startAutoSellLoop = function()
 end
 
 -- =================================================================
--- LOGICA DE REPARACIÓN (V4.43 - Bring Then Clean)
+-- LOGICA DE REPARACIÓN (V4.46)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
+    
+    -- V4.45 LOGIC: BÚSQUEDA DE AUTO PROPIO (Si el chatarra desapareció)
+    local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local targetCar = nil
+    print("REPAIR: Buscando auto propio cercano...")
+    
+    for i = 1, 10 do -- 5 segundos de búsqueda
+        local closest = nil
+        local minDst = 20
+        
+        for _, car in ipairs(Workspace:WaitForChild("Vehicles"):GetChildren()) do
+            if car:IsA("Model") and car:GetAttribute("Owner") == player.Name then
+                local pivot = car:GetPivot().Position
+                local dist = (rootPart.Position - pivot).Magnitude
+                if dist < minDst then minDst = dist; closest = car end
+            end
+        end
+        
+        if closest then
+            targetCar = closest
+            print("REPAIR: ¡Auto propio encontrado! ("..closest.Name..")")
+            break
+        end
+        task.wait(0.5)
+    end
+    
+    if not targetCar then
+        print("REPAIR: No se encontró auto propio. Abortando reparación.")
+        isRepairRunning = false
+        return
+    end
+
     isRepairRunning = true
     task.wait(1)
     RepairStatusLabel.Text = "REPAIR: Iniciando..."
 
+    local carModel = targetCar 
     local character = player.Character
-    local rootPart = character:WaitForChild("HumanoidRootPart")
     local humanoid = character:FindFirstChild("Humanoid")
     if humanoid then humanoid.Sit = false; humanoid.Jump = true end
 
@@ -205,64 +239,32 @@ startAutoRepair = function()
         end; return closest
     end
     
-    local function findClosestCar()
-        local vehiclesFolder = Workspace:WaitForChild("Vehicles")
-        local closest = nil; local minDst = math.huge
-        for _, car in ipairs(vehiclesFolder:GetChildren()) do
-            if car:IsA("Model") and car:GetAttribute("Owner") == player.Name then
-                local dist = (rootPart.Position - car:GetPivot().Position).Magnitude
-                if dist < minDst then minDst = dist; closest = car end
-            end
-        end; return closest
-    end 
-
     local pitStop = getPitStop()
-    local carModel = findClosestCar()
-    
-    if not pitStop or not carModel then isRepairRunning = false; return end
+    if not pitStop then isRepairRunning = false; return end
     
     -- TP AL TALLER
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1)
 
-    -- >>> V4.43 LOGICA MEJORADA: AGRUPAR (BRING) LUEGO BORRAR (DELETE) <<<
+    -- LIMPIEZA INTELIGENTE
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     local existingParts = moveablePartsFolder:GetChildren()
     
     if #existingParts > 0 then
-        print("REPAIR: Detectada basura ("..#existingParts.."). Iniciando limpieza completa...")
-        RepairStatusLabel.Text = "REPAIR: Agrupando basura..."
-        
-        -- PASO 1: TRAER
+        print("REPAIR: Detectada basura. Limpiando...")
         local bringBtn = findButtonByExactText("Bring dropped parts")
-        if bringBtn then
-            clickGUIButton(bringBtn)
-            task.wait(1.5) -- Esperar a que lleguen
-        else
-            print("WARN: No se encontró botón Bring.")
-        end
+        if bringBtn then clickGUIButton(bringBtn); task.wait(1.5) end
 
-        -- PASO 2: BORRAR
         local deleteBtn = findButtonByExactText("Delete dropped parts")
         if deleteBtn then
             clickGUIButton(deleteBtn)
-            RepairStatusLabel.Text = "REPAIR: Borrando (Espera Smart)..."
-            
-            -- PASO 3: ESPERA INTELIGENTE
+            RepairStatusLabel.Text = "REPAIR: Borrando..."
             for i = 1, 8 do
-                if #moveablePartsFolder:GetChildren() == 0 then
-                    print("REPAIR: ¡Limpieza completada en "..i.."s!")
-                    break
-                end
+                if #moveablePartsFolder:GetChildren() == 0 then break end
                 task.wait(1)
             end
-        else
-            print("WARN: No se encontró botón Delete.")
         end
-    else
-        print("REPAIR: Suelo limpio, omitiendo limpieza.")
     end
-    -- >>> FIN LIMPIEZA <<<
     
     RepairStatusLabel.Text = "REPAIR: Trabajando..."
 
@@ -460,6 +462,12 @@ end
 spawn(function()
     while true do
         task.wait(1)
+        
+        if isRepairRunning then
+            AutoBuyCarStatusLabel.Text = "COMPRA: Esperando reparación..."
+            continue
+        end
+
         if currentMode ~= "BUY" or #autoBuyCarQueue == 0 or isAutoBuyCarBuying then continue end
 
         isAutoBuyCarBuying = true
@@ -480,11 +488,33 @@ spawn(function()
         root.CFrame = carToBuy:GetPivot() * CFrame.new(-8, 0, 0)
         AutoBuyCarStatusLabel.Text = "COMPRA: Intentando..."
         task.wait(0.8)
-        fireclickdetector(carToBuy.ClickDetector)
-        task.wait(1.5)
         
-        if carToBuy and carToBuy.Parent then
-            AutoBuyCarStatusLabel.Text = "COMPRA: Falló"
+        -- >>> V4.46 LOGICA DE REINTENTOS (INSISTENCIA) <<<
+        local purchaseSuccess = false
+        for i = 1, 5 do
+            if not carToBuy or not carToBuy.Parent then 
+                print("COMPRA: Auto desapareció en intento #"..i)
+                purchaseSuccess = true -- Asumimos éxito si desaparece
+                break 
+            end
+            
+            -- Reajustar posición si nos movimos
+            root.CFrame = carToBuy:GetPivot() * CFrame.new(-6, 0, 0) -- Más cerca (-6 en vez de -8)
+            
+            print("COMPRA: Click #"..i)
+            fireclickdetector(carToBuy.ClickDetector)
+            task.wait(0.5)
+            
+            -- Si desaparece o cambia de dueño (si pudiéramos chequearlo), es éxito
+            if not carToBuy.Parent then
+                purchaseSuccess = true
+                break
+            end
+        end
+        -- >>> FIN REINTENTOS <<<
+        
+        if not purchaseSuccess and carToBuy.Parent then
+            AutoBuyCarStatusLabel.Text = "COMPRA: Falló (Timeout)"
             task.wait(FAIL_DELAY)
             isAutoBuyCarBuying = false
             if #autoBuyCarQueue == 0 then task.spawn(scanExistingCars) end
@@ -498,7 +528,7 @@ spawn(function()
         end
         
         isAutoBuyCarBuying = false
-        if currentMode == "BUY" and #autoBuyCarQueue == 0 then
+        if currentMode == "BUY" and #autoBuyCarQueue == 0 and not isRepairRunning then
             task.spawn(scanExistingCars)
         end
     end
@@ -541,4 +571,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.43 (BRING THEN CLEAN) LISTA ---")
+print("--- V4.46 (BUY RETRY FIX) LISTA ---")
