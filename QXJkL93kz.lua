@@ -1,5 +1,8 @@
--- SCRIPT MAESTRO (V4.46): "COMPRADOR INSISTENTE"--
-print("--- CARGANDO MAQUINA DE ESTADO V4.46 (BUY RETRY FIX) ---")
+-- =================================================================
+-- --- SCRIPT MAESTRO (V4.47): "VENTA SEGURA" ---
+-- --- FIX: Verifica distancia al vendedor ANTES de invocar autos ---
+-- =================================================================
+print("--- CARGANDO MAQUINA DE ESTADO V4.47 (SELL DISTANCE FIX) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -66,12 +69,12 @@ local startAutoRepair
 local buyCar
 
 -- --- INTERFAZ GRÁFICA (GUI) ---
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V446"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V447"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.46 (Buy Retry Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.47 (Sell Distance Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -129,16 +132,45 @@ local function getSellPrompt()
     return sellCar and sellCar:FindFirstChildWhichIsA("ProximityPrompt", true)
 end
 
+-- =================================================================
+-- LOGICA DE VENTA CORREGIDA (V4.47)
+-- =================================================================
 startAutoSellLoop = function()
     local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not rootPart then return end
     local garageFolder = playerData:WaitForChild("Garage")
     
-    rootPart.CFrame = VENDEDOR_CFRAME
-    task.wait(1.5) 
+    print("VENTA: Iniciando viaje al vendedor...")
+    SellStatusLabel.Text = "VENTA: Viajando..."
+    
+    -- >>> V4.47 FIX: ASEGURAR POSICIÓN <<<
+    local arrived = false
+    for i = 1, 10 do -- Intentar TP 10 veces (5 segundos)
+        rootPart.CFrame = VENDEDOR_CFRAME
+        task.wait(0.5)
+        if (rootPart.Position - VENDEDOR_CFRAME.Position).Magnitude < 10 then
+            arrived = true
+            break
+        end
+    end
+    
+    if not arrived then
+        print("VENTA: Fallo al teletransportar. Reintentando...")
+        SellStatusLabel.Text = "VENTA: Fallo TP"
+        task.wait(1)
+        startAutoSellLoop() -- Recursivo si falla
+        return
+    end
+    
+    print("VENTA: Llegada confirmada. Esperando carga de mapa...")
+    task.wait(2) -- Pausa obligatoria para cargar el Prompt
+    -- >>> FIN FIX <<<
     
     local promptVenta = getSellPrompt()
-    if not promptVenta then print("ERROR VENTA: Prompt no encontrado.") end
+    if not promptVenta then 
+        print("ERROR VENTA: Prompt no encontrado tras espera.")
+        SellStatusLabel.Text = "VENTA: Error Prompt"
+    end
 
     for _, carData in ipairs(garageFolder:GetChildren()) do
         if currentMode ~= "SELL" then break end 
@@ -149,6 +181,12 @@ startAutoSellLoop = function()
             SellStatusLabel.Text = "VENTA: "..modelName
             local carIDToSell = carData.Name
             local targetCFrame = rootPart.CFrame * CFrame.new(0, 3, 12)
+            
+            -- Asegurar que seguimos cerca antes de invocar
+            if (rootPart.Position - VENDEDOR_CFRAME.Position).Magnitude > 15 then
+                rootPart.CFrame = VENDEDOR_CFRAME
+                task.wait(0.5)
+            end
             
             pcall(function() remoteLoad:InvokeServer(carData, targetCFrame) end)
             local carInWorld = Workspace.Vehicles:WaitForChild(carIDToSell, 5)
@@ -176,7 +214,7 @@ end
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
     
-    -- V4.45 LOGIC: BÚSQUEDA DE AUTO PROPIO (Si el chatarra desapareció)
+    -- V4.45 LOGIC: BÚSQUEDA DE AUTO PROPIO
     local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not rootPart then return end
     
@@ -520,6 +558,19 @@ spawn(function()
 
         AutoBuyCarStatusLabel.Text = "COMPRA: ¡Éxito!"
         
+        -- ABRIR CAPO (V4.44)
+        local hoodPart = carToBuy:FindFirstChild("Misc") and carToBuy.Misc:FindFirstChild("Hood") and carToBuy.Misc.Hood:FindFirstChild("Detector") and carToBuy.Misc.Hood.Detector:FindFirstChild("ClickDetector")
+        if hoodPart then
+            fireclickdetector(hoodPart)
+            task.wait(3) 
+        else
+             local anyCD = carToBuy:FindFirstChild("Hood", true)
+             if anyCD then
+                 local cd = anyCD:FindFirstChildWhichIsA("ClickDetector", true)
+                 if cd then fireclickdetector(cd); task.wait(3) end
+            end
+        end
+        
         if currentMode == "BUY" then
             startAutoRepair()
         end
@@ -568,5 +619,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.46 (BUY RETRY FIX) LISTA ---")
-
+print("--- V4.47 (SELL DISTANCE FIX) LISTA ---")
