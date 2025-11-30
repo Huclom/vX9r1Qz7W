@@ -1,7 +1,4 @@
--- =================================================================
--- --- SCRIPT MAESTRO (V4.46): "COMPRADOR INSISTENTE" ---
--- --- FIX: Reintentos de compra si el primer click falla ---
--- =================================================================
+-- SCRIPT MAESTRO (V4.46): "COMPRADOR INSISTENTE"--
 print("--- CARGANDO MAQUINA DE ESTADO V4.46 (BUY RETRY FIX) ---")
 
 local Players = game:GetService("Players")
@@ -572,3 +569,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
 end)
 
 print("--- V4.46 (BUY RETRY FIX) LISTA ---")
+
