@@ -1,17 +1,19 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V4.47): "VENTA SEGURA" ---
--- --- FIX: Verifica distancia al vendedor ANTES de invocar autos ---
+-- --- SCRIPT MAESTRO (V4.48): "FUERZA BRUTA" ---
+-- --- FIX: Clicks físicos + Auto-Confirmar GUI (Si falla el hook) ---
 -- =================================================================
-print("--- CARGANDO MAQUINA DE ESTADO V4.47 (SELL DISTANCE FIX) ---")
+print("--- CARGANDO MAQUINA DE ESTADO V4.48 (PHYSICAL CLICK FIX) ---")
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualInputManager = game:GetService("VirtualInputManager") 
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local playerData = player:WaitForChild("PlayerData")
+local camera = Workspace.CurrentCamera
 
 local RS_Events = ReplicatedStorage:WaitForChild("Events", 10)
 local CONFIRM_REMOTE = RS_Events and RS_Events:FindFirstChild("HUD", true) and RS_Events:FindFirstChild("HUD", true):FindFirstChild("Confirmation")
@@ -34,8 +36,7 @@ local AUTOS_PARA_VENDER = {
     "Four Traffic", "Lokswag Golo MK5", "Toyoda Hellox", "Holde Inteiro",
     "Leskus not200", "BNV K3", "Missah Silva", "Siath Lion", "Fia-Te Ponto",
     "Peujo 200e6", "Ontel Costa", "Lokswag Golo", "Renas Kapturado", "Sacode Oitava",
-    "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao", "Auidy V5", 
-    "Sabes Muito", "Xitro J3", "Toyoda Yapp"
+    "Lokswag Passar", "Lokswag Golo MK4", "Auidy V4", "Holde Ciwiq", "BNV K3 e92", "Chule Camarao", "Auidy V5"
 }
 
 -- --- UTILIDADES UI ---
@@ -62,6 +63,43 @@ local function clickGUIButton(uiObject)
     return true
 end
 
+-- >>> V4.48: NUEVA FUNCIÓN CLICK FÍSICO <<<
+local function forcePhysicalClick(targetPart)
+    if not targetPart then return end
+    
+    -- 1. Mirar al objeto
+    camera.CFrame = CFrame.new(camera.CFrame.Position, targetPart.Position)
+    task.wait(0.1)
+    
+    -- 2. Click al centro de la pantalla (donde estamos mirando)
+    local viewportSize = camera.ViewportSize
+    local centerX = viewportSize.X / 2
+    local centerY = viewportSize.Y / 2
+    
+    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1)
+end
+
+-- >>> V4.48: NUEVA FUNCIÓN AUTO-CONFIRMAR GUI <<<
+local function checkAndClickConfirmGUI()
+    -- Buscar botones verdes o con texto "Yes" que aparezcan en pantalla
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if gui:IsA("TextButton") or (gui:IsA("TextLabel") and gui.Parent:IsA("GuiButton")) then
+            local text = gui.Text:lower()
+            if text == "yes" or text == "confirm" or text == "buy" then
+                if gui:IsDescendantOf(playerGui) and gui.Visible then
+                    local btn = gui:IsA("GuiButton") and gui or gui.Parent
+                    print("GUI: Detectado botón de confirmación. Click!")
+                    clickGUIButton(btn)
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 -- --- DECLARACIÓN ADELANTADA ---
 local startAutoSellLoop
 local scanExistingCars
@@ -69,12 +107,12 @@ local startAutoRepair
 local buyCar
 
 -- --- INTERFAZ GRÁFICA (GUI) ---
-local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V447"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name = "MasterControlGUI_V448"; ScreenGui.Parent = playerGui; ScreenGui.ResetOnSpawn = false
 local MainFrame = Instance.new("Frame"); MainFrame.Name = "MainFrame"; MainFrame.Size = UDim2.new(0, 250, 0, 280); MainFrame.Position = UDim2.new(0.5, -125, 0, 100);
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30); MainFrame.Draggable = true; MainFrame.Active = true; MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner"); UICorner.CornerRadius = UDim.new(0, 8); UICorner.Parent = MainFrame
 local TitleLabel = Instance.new("TextLabel"); TitleLabel.Name = "Title"; TitleLabel.Size = UDim2.new(1, 0, 0, 30); TitleLabel.BackgroundColor3 = Color3.fromRGB(45, 45, 45);
-TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.47 (Sell Distance Fix)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255); TitleLabel.Text = "V4.48 (Fuerza Bruta)"; TitleLabel.Font = Enum.Font.SourceSansBold; TitleLabel.TextSize = 16; TitleLabel.Parent = MainFrame
 
 local MasterToggleButton = Instance.new("TextButton"); MasterToggleButton.Size = UDim2.new(0.9, 0, 0, 40); MasterToggleButton.Position = UDim2.new(0.05, 0, 0, 40);
 MasterToggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0); MasterToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255); MasterToggleButton.Text = "Sistema Total (OFF)"; MasterToggleButton.Font = Enum.Font.SourceSansBold; MasterToggleButton.TextSize = 18; MasterToggleButton.Parent = MainFrame
@@ -101,7 +139,9 @@ local function updateGUI(mode)
 end
 updateGUI(currentMode)
 
+-- --- MASTER HOOK (CONFIRMACIÓN REMOTA) ---
 local function masterOnClientInvoke(text)
+    print("HOOK: Se solicitó confirmación con texto: " .. tostring(text))
     if currentMode == "BUY" or currentMode == "SELL" then return true end
     if _G.Confirmation then return _G.Confirmation(text) end
     return false
@@ -109,11 +149,8 @@ end
 
 if CONFIRM_REMOTE then
     CONFIRM_REMOTE.OnClientInvoke = masterOnClientInvoke
-    player.CharacterAdded:Connect(function()
-        task.wait(5)
-        local newR = ReplicatedStorage:FindFirstChild("Events", true) and ReplicatedStorage:FindFirstChild("Events", true):FindFirstChild("HUD", true) and ReplicatedStorage:FindFirstChild("Events", true):FindFirstChild("HUD", true):FindFirstChild("Confirmation")
-        if newR then newR.OnClientInvoke = masterOnClientInvoke end
-    end)
+else
+    print("WARN: No se encontró Remote de Confirmación. Se usará escáner GUI.")
 end
 
 if NOTIFY_REMOTE then
@@ -133,7 +170,7 @@ local function getSellPrompt()
 end
 
 -- =================================================================
--- LOGICA DE VENTA CORREGIDA (V4.47)
+-- LOGICA DE VENTA (V4.47)
 -- =================================================================
 startAutoSellLoop = function()
     local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -143,35 +180,24 @@ startAutoSellLoop = function()
     print("VENTA: Iniciando viaje al vendedor...")
     SellStatusLabel.Text = "VENTA: Viajando..."
     
-    -- >>> V4.47 FIX: ASEGURAR POSICIÓN <<<
     local arrived = false
-    for i = 1, 10 do -- Intentar TP 10 veces (5 segundos)
+    for i = 1, 10 do 
         rootPart.CFrame = VENDEDOR_CFRAME
         task.wait(0.5)
-        if (rootPart.Position - VENDEDOR_CFRAME.Position).Magnitude < 10 then
-            arrived = true
-            break
-        end
+        if (rootPart.Position - VENDEDOR_CFRAME.Position).Magnitude < 10 then arrived = true; break end
     end
     
     if not arrived then
         print("VENTA: Fallo al teletransportar. Reintentando...")
-        SellStatusLabel.Text = "VENTA: Fallo TP"
-        task.wait(1)
-        startAutoSellLoop() -- Recursivo si falla
+        startAutoSellLoop()
         return
     end
     
-    print("VENTA: Llegada confirmada. Esperando carga de mapa...")
-    task.wait(2) -- Pausa obligatoria para cargar el Prompt
-    -- >>> FIN FIX <<<
+    print("VENTA: Llegada confirmada. Esperando carga...")
+    task.wait(2)
     
     local promptVenta = getSellPrompt()
-    if not promptVenta then 
-        print("ERROR VENTA: Prompt no encontrado tras espera.")
-        SellStatusLabel.Text = "VENTA: Error Prompt"
-    end
-
+    
     for _, carData in ipairs(garageFolder:GetChildren()) do
         if currentMode ~= "SELL" then break end 
         local modelName = carData:FindFirstChild("Model") and carData.Model.Value
@@ -182,7 +208,6 @@ startAutoSellLoop = function()
             local carIDToSell = carData.Name
             local targetCFrame = rootPart.CFrame * CFrame.new(0, 3, 12)
             
-            -- Asegurar que seguimos cerca antes de invocar
             if (rootPart.Position - VENDEDOR_CFRAME.Position).Magnitude > 15 then
                 rootPart.CFrame = VENDEDOR_CFRAME
                 task.wait(0.5)
@@ -214,17 +239,15 @@ end
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
     
-    -- V4.45 LOGIC: BÚSQUEDA DE AUTO PROPIO
     local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not rootPart then return end
     
     local targetCar = nil
     print("REPAIR: Buscando auto propio cercano...")
     
-    for i = 1, 10 do -- 5 segundos de búsqueda
+    for i = 1, 10 do 
         local closest = nil
         local minDst = 20
-        
         for _, car in ipairs(Workspace:WaitForChild("Vehicles"):GetChildren()) do
             if car:IsA("Model") and car:GetAttribute("Owner") == player.Name then
                 local pivot = car:GetPivot().Position
@@ -232,17 +255,12 @@ startAutoRepair = function()
                 if dist < minDst then minDst = dist; closest = car end
             end
         end
-        
-        if closest then
-            targetCar = closest
-            print("REPAIR: ¡Auto propio encontrado! ("..closest.Name..")")
-            break
-        end
+        if closest then targetCar = closest; break end
         task.wait(0.5)
     end
     
     if not targetCar then
-        print("REPAIR: No se encontró auto propio. Abortando reparación.")
+        print("REPAIR: No se encontró auto propio. Abortando.")
         isRepairRunning = false
         return
     end
@@ -256,11 +274,7 @@ startAutoRepair = function()
     local humanoid = character:FindFirstChild("Humanoid")
     if humanoid then humanoid.Sit = false; humanoid.Jump = true end
 
-    local machineMap = {
-        ["Battery"] = "BatteryCharger", ["AirIntake"] = "PartsWasher", ["Radiator"] = "PartsWasher",
-        ["CylinderHead"] = "GrindingMachine", ["EngineBlock"] = "GrindingMachine", ["ExhaustManifold"] = "GrindingMachine",
-        ["Suspension"] = "GrindingMachine", ["Alternator"] = "GrindingMachine", ["Transmission"] = "GrindingMachine"
-    }
+    local machineMap = { ["Battery"]="BatteryCharger", ["AirIntake"]="PartsWasher", ["Radiator"]="PartsWasher", ["CylinderHead"]="GrindingMachine", ["EngineBlock"]="GrindingMachine", ["ExhaustManifold"]="GrindingMachine", ["Suspension"]="GrindingMachine", ["Alternator"]="GrindingMachine", ["Transmission"]="GrindingMachine" }
 
     local function getPitStop()
         local map = Workspace:WaitForChild("Map")
@@ -277,27 +291,20 @@ startAutoRepair = function()
     local pitStop = getPitStop()
     if not pitStop then isRepairRunning = false; return end
     
-    -- TP AL TALLER
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1)
 
-    -- LIMPIEZA INTELIGENTE
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     local existingParts = moveablePartsFolder:GetChildren()
     
     if #existingParts > 0 then
-        print("REPAIR: Detectada basura. Limpiando...")
         local bringBtn = findButtonByExactText("Bring dropped parts")
         if bringBtn then clickGUIButton(bringBtn); task.wait(1.5) end
-
         local deleteBtn = findButtonByExactText("Delete dropped parts")
         if deleteBtn then
             clickGUIButton(deleteBtn)
             RepairStatusLabel.Text = "REPAIR: Borrando..."
-            for i = 1, 8 do
-                if #moveablePartsFolder:GetChildren() == 0 then break end
-                task.wait(1)
-            end
+            for i = 1, 8 do if #moveablePartsFolder:GetChildren() == 0 then break end; task.wait(1) end
         end
     end
     
@@ -326,7 +333,6 @@ startAutoRepair = function()
                 local splitVal = string.split(valueObj.Value, "|")
                 if #splitVal >= 2 then droppedName = splitVal[2] end
             end
-            
             droppedPartNameMap[fullPartName] = droppedName
             table.insert(allPartNames, fullPartName) 
             
@@ -524,23 +530,27 @@ spawn(function()
         AutoBuyCarStatusLabel.Text = "COMPRA: Intentando..."
         task.wait(0.8)
         
-        -- >>> V4.46 LOGICA DE REINTENTOS (INSISTENCIA) <<<
+        -- >>> V4.48 LOGICA DE REINTENTOS (DOBLE CLICK) <<<
         local purchaseSuccess = false
         for i = 1, 5 do
             if not carToBuy or not carToBuy.Parent then 
-                print("COMPRA: Auto desapareció en intento #"..i)
-                purchaseSuccess = true -- Asumimos éxito si desaparece
+                purchaseSuccess = true
                 break 
             end
             
-            -- Reajustar posición si nos movimos
-            root.CFrame = carToBuy:GetPivot() * CFrame.new(-6, 0, 0) -- Más cerca (-6 en vez de -8)
+            root.CFrame = carToBuy:GetPivot() * CFrame.new(-6, 0, 0)
             
-            print("COMPRA: Click #"..i)
+            print("COMPRA: Click Fuerte #"..i)
+            -- Metodo 1: Script
             fireclickdetector(carToBuy.ClickDetector)
-            task.wait(0.5)
+            -- Metodo 2: Físico simulado
+            forcePhysicalClick(carToBuy:FindFirstChild("Body") and carToBuy.Body:FindFirstChild("Part") or carToBuy.PrimaryPart)
             
-            -- Si desaparece o cambia de dueño (si pudiéramos chequearlo), es éxito
+            -- Metodo 3: Auto-Click Confirmación GUI
+            checkAndClickConfirmGUI()
+            
+            task.wait(0.8)
+            
             if not carToBuy.Parent then
                 purchaseSuccess = true
                 break
@@ -558,7 +568,7 @@ spawn(function()
 
         AutoBuyCarStatusLabel.Text = "COMPRA: ¡Éxito!"
         
-        -- ABRIR CAPO (V4.44)
+        -- ABRIR CAPO (V4.44 Logic)
         local hoodPart = carToBuy:FindFirstChild("Misc") and carToBuy.Misc:FindFirstChild("Hood") and carToBuy.Misc.Hood:FindFirstChild("Detector") and carToBuy.Misc.Hood.Detector:FindFirstChild("ClickDetector")
         if hoodPart then
             fireclickdetector(hoodPart)
@@ -619,4 +629,4 @@ MasterToggleButton.MouseButton1Click:Connect(function()
     updateGUI(currentMode)
 end)
 
-print("--- V4.47 (SELL DISTANCE FIX) LISTA ---")
+print("--- V4.48 (PHYSICAL CLICK FIX) LISTA ---")
