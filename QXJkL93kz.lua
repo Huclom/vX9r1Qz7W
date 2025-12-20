@@ -1,6 +1,6 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V6.1): "NO-SIT LOCK" ---
--- --- FIX: Se teletransporta AL LADO del auto (nunca dentro) ---
+-- --- SCRIPT MAESTRO (V6.2): "PARALLEL REPAIR FIX" ---
+-- --- FIX: Restaura la reparación simultánea de múltiples piezas ---
 -- =================================================================
 
 -- >>> SISTEMA ANTI-OVERLAP <<<
@@ -13,13 +13,13 @@ getgenv().MechanicFarmRunning = true
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "FIX IT UP | Auto-Farm V6.1",
-   LoadingTitle = "Modo 'De Pie' Activado...",
-   LoadingSubtitle = "by RevSeba",
+   Name = "FIX IT UP | Auto-Farm V6.2",
+   LoadingTitle = "Modo Paralelo Activado...",
+   LoadingSubtitle = "Rev Seba",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV61"
+      FileName = "ManagerV62"
    },
    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
    KeySystem = false,
@@ -163,13 +163,12 @@ TabManual:CreateButton({
 })
 
 -- =================================================================
--- REPARACIÓN V6.1 (NO-SIT LOCK)
+-- REPARACIÓN V6.2 (PARALLEL RESTORED)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
     local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     
-    -- 1. Buscamos auto propio
     local targetCar = nil
     for i = 1, 10 do 
         if currentMode ~= "BUY" then return end 
@@ -191,6 +190,7 @@ startAutoRepair = function()
     local carModel = targetCar 
     local machineMap = { ["Battery"]="BatteryCharger", ["AirIntake"]="PartsWasher", ["Radiator"]="PartsWasher", ["CylinderHead"]="GrindingMachine", ["EngineBlock"]="GrindingMachine", ["ExhaustManifold"] = "GrindingMachine", ["Suspension"]="GrindingMachine", ["Alternator"]="GrindingMachine", ["Transmission"]="GrindingMachine" }
 
+    -- Ir al Pit
     local function getPitStop()
         local map = Workspace:WaitForChild("Map")
         local pitStopPosition = Vector3.new(-981.30127, 18.0568581, -129.036621)
@@ -248,22 +248,24 @@ startAutoRepair = function()
         end
     end
      
+    -- Desmontar
     for _, partName in ipairs(allPartNames) do 
         pcall(function() carPartsEvent:FireServer("RemovePart", partName) end)
         task.wait(0.1) 
     end
     task.wait(1.5); tryClickButtonByName("bring dropped parts"); task.wait(2)
      
-    -- Comprar
+    -- Comprar Paralelo
     local shopFolder = Workspace:WaitForChild("PartsStore"):WaitForChild("SpareParts"):WaitForChild("Parts")
     spawn(function()
         for _, partString in ipairs(partsToBuy_Data) do
             local split = string.split(partString, "|")
             local itemCD = shopFolder:FindFirstChild(split[2], true) and shopFolder:FindFirstChild(split[2], true):FindFirstChild(split[3], true) and shopFolder:FindFirstChild(split[2], true):FindFirstChild(split[3], true):FindFirstChild("ClickDetector", true)
-            if itemCD then fireclickdetector(itemCD); task.wait(0.5) end
+            if itemCD then fireclickdetector(itemCD); task.wait(0.1) end -- Click rápido
         end
     end)
 
+    -- Configurar Máquinas
     local machinePools = { BatteryCharger = {}, GrindingMachine = {}, PartsWasher = {} }
     local machineClickDetectors = {} 
     for _, machine in ipairs(pitStop:GetChildren()) do
@@ -280,10 +282,16 @@ startAutoRepair = function()
     end
     local machineIndexes = { BatteryCharger = 1, GrindingMachine = 1, PartsWasher = 1 }
 
-    -- Reparación
+    -- >>> REPARACIÓN PARALELA V6.2 (FIXED) <<<
+    updateStatus("REPARANDO: Distribuyendo piezas a máquinas...")
+    
+    local partsBeingRepaired = {} 
+    
+    -- Fase 1: Distribuir todas las piezas simultáneamente
     for _, partSlotName in ipairs(partsToRepair_Names) do
         local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
         local partObject = moveablePartsFolder:FindFirstChild(targetDroppedName)
+        
         if partObject then
             local wear = partObject:GetAttribute("Wear") or 0
             if wear > 0 then
@@ -291,19 +299,58 @@ startAutoRepair = function()
                 if basePartName:find("Transmission") then basePartName = "Transmission" end
                 local machineName = machineMap[basePartName]
                 local pool = machinePools[machineName]
+                
                 if pool and #pool > 0 then
-                    local machine = pool[1]
+                    -- Rotación de máquinas para no saturar
+                    local idx = machineIndexes[machineName]
+                    local machine = pool[idx]
+                    machineIndexes[machineName] = (idx % #pool) + 1 -- Siguiente máquina
+                    
                     local detectorPad = machine:FindFirstChild("Detector", true)
+                    
                     if detectorPad then
+                        -- Enviar pieza a la máquina
                         partObject:PivotTo(detectorPad.CFrame * CFrame.new(0, 0.5, 0))
-                        task.wait(0.2)
-                        fireclickdetector(machineClickDetectors[machine])
-                        task.wait(3)
+                        
+                        -- Guardar en cola para monitorear
+                        table.insert(partsBeingRepaired, { 
+                            Part = partObject, 
+                            Machine = machine, 
+                            CD = machineClickDetectors[machine],
+                            StartTime = os.clock()
+                        })
                     end
                 end
             end
         end
     end 
+    
+    -- Fase 2: Activar máquinas y esperar
+    task.wait(0.5) -- Esperar que caigan las piezas
+    for _, job in ipairs(partsBeingRepaired) do
+        if job.CD then fireclickdetector(job.CD) end
+    end
+    
+    -- Fase 3: Esperar a que terminen
+    local repairTimeout = 0
+    while #partsBeingRepaired > 0 and repairTimeout < 20 do
+        task.wait(0.5)
+        repairTimeout = repairTimeout + 0.5
+        
+        for i = #partsBeingRepaired, 1, -1 do
+            local job = partsBeingRepaired[i]
+            local wear = job.Part:GetAttribute("Wear") or 0
+            
+            if wear == 0 then
+                -- Reparado
+                table.remove(partsBeingRepaired, i)
+            elseif (os.clock() - job.StartTime) > 8 then
+                -- Se atascó, intentar clickear de nuevo
+                job.StartTime = os.clock()
+                if job.CD then fireclickdetector(job.CD) end
+            end
+        end
+    end
 
     -- Ensamblar
     updateStatus("REPARANDO: Ensamblando...")
@@ -328,23 +375,16 @@ startAutoRepair = function()
     -- >>> V6.1: TELETRANSFORTE DE PIE (SIN SENTARSE) <<<
     updateStatus("REPARANDO: Regresando al auto (DE PIE)...")
     
-    -- Determinamos posición segura: Pivot del auto + 6 studs a la izquierda + 2 arriba
     local safePos = carModel:GetPivot() * CFrame.new(-6, 2, 0)
-    
-    -- 1. Intentamos viajar
     rootPart.CFrame = safePos
     
-    -- 2. BLOQUEO: Esperamos hasta que FÍSICAMENTE estemos cerca
     local arrived = false
     local attempts = 0
     repeat
         task.wait(0.2)
         attempts = attempts + 1
         local dist = (rootPart.Position - carModel:GetPivot().Position).Magnitude
-        
-        -- Tolerancia de 15 studs (suficiente para pintar, lejos para no bugear)
         if dist < 15 then arrived = true end
-        
         if attempts % 5 == 0 then rootPart.CFrame = safePos end
     until arrived or attempts > 20
     
@@ -354,7 +394,6 @@ startAutoRepair = function()
     
     if paintPrompt and setPaintEvent then
         updateStatus("Finalizando (Pintura)...")
-        
         fireproximityprompt(paintPrompt)
         task.wait(0.5) 
         
@@ -365,7 +404,6 @@ startAutoRepair = function()
         task.wait(2)
     end
      
-    -- >>> SOLO AHORA LIBERAMOS EL CANDADO <<<
     isRepairRunning = false 
     updateStatus("LIBRE: Buscando nuevos VIPs...")
 end
@@ -401,7 +439,6 @@ spawn(function()
     while getgenv().MechanicFarmRunning do
         task.wait(1)
         
-        -- >>> CANDADO MAESTRO <<<
         if isRepairRunning then continue end
         
         if currentMode ~= "BUY" or #autoBuyCarQueue == 0 or isAutoBuyCarBuying then continue end
@@ -465,4 +502,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "V6.1 Final", Content = "No-Sit Lock Activado.", Duration = 5})
+Rayfield:Notify({Title = "V6.2 Final", Content = "Paralelo + No-Sit Activado.", Duration = 5})
