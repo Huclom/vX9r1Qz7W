@@ -1,19 +1,19 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V5.7): "PROXIMITY FIX" ---
--- --- FIX: Se para al lado del auto y detona la pintura remotamente ---
+-- --- SCRIPT MAESTRO (V5.8): "DECIMAL PRECISION" ---
+-- --- FIX: Ahora detecta porcentajes decimales (ej: 0.05%) ---
 -- =================================================================
 
 -- Cargar Rayfield Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "FIX IT UP! | Auto-Farm V5.7",
-   LoadingTitle = "Optimización de Distancia...",
+   Name = "FIX IT UP | Auto-Farm V5.8",
+   LoadingTitle = "Cargando Soporte Decimal...",
    LoadingSubtitle = "by RevSeba",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV57"
+      FileName = "ManagerV58"
    },
    Discord = {
       Enabled = false,
@@ -114,7 +114,7 @@ local MainToggle = TabFarm:CreateToggle({
 
 local VIPSlider = TabSettings:CreateSlider({
    Name = "Porcentaje VIP Máximo",
-   Range = {1, 30},
+   Range = {0.1, 30}, -- Permitimos decimales en el slider si Rayfield lo soporta, o enteros
    Increment = 1,
    Suffix = "%",
    CurrentValue = 10,
@@ -219,6 +219,7 @@ startAutoSellLoop = function()
              
             if carInWorld then
                 carInWorld:PivotTo(targetCFrame)
+                -- Pintura básica al vender (opcional)
                 if setPaintEvent then
                    pcall(function() setPaintEvent:FireServer("Car", carInWorld, Color3.fromHSV(math.random(), 1, 1)) end)
                 end
@@ -247,7 +248,7 @@ if NOTIFY_REMOTE then
 end
 
 -- =================================================================
--- LÓGICA DE REPARACIÓN (V5.7 SIMPLE)
+-- LÓGICA DE REPARACIÓN (V5.8)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -455,29 +456,27 @@ startAutoRepair = function()
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel.Misc:FindFirstChild("Hood", true) and carModel.Misc.Hood:FindFirstChild("Detector", true) and carModel.Misc.Hood.Detector:FindFirstChild("ClickDetector")
     if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
     
-    -- >>> SECCIÓN DE PINTURA (V5.7: SIN VIAJES, SOLO PROXIMIDAD) <<<
-    
+    -- >>> SECCIÓN DE PINTURA (V5.8) <<<
     local paintArea = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint")
     local paintPrompt = paintArea:FindFirstChild("Prompt", true) and paintArea:FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
     
     if paintPrompt and setPaintEvent then
         updateStatus("Finalizando (Pintura)...")
         
-        -- 1. Nos movemos AL LADO del auto que acabamos de reparar (de pie, sin sentarse)
-        -- Usamos GetPivot() + 5 studs a la derecha para estar "cerca" pero no encima.
+        -- 1. Nos movemos AL LADO del auto (Proximidad para pintar)
         if carModel and carModel.PrimaryPart then
             rootPart.CFrame = carModel:GetPivot() * CFrame.new(5, 0, 0)
         elseif carModel and carModel:FindFirstChild("DriveSeat") then
              rootPart.CFrame = carModel.DriveSeat.CFrame * CFrame.new(5, 0, 0)
         end
         
-        task.wait(0.5) -- Esperar que cargue
+        task.wait(0.5)
         
-        -- 2. Activamos el botón de pintura REMOTAMENTE (sin ir allá)
+        -- 2. Activamos botón remotamente
         fireproximityprompt(paintPrompt)
         task.wait(0.5) 
         
-        -- 3. Enviamos la señal de pintura con el FIX ("Car")
+        -- 3. Pintamos
         pcall(function() 
             setPaintEvent:FireServer("Car", carModel, Color3.fromHSV(math.random(), 1, 1)) 
             print("🖌️ PINTURA ÉXITO: Método 'Car' enviado.")
@@ -493,7 +492,7 @@ startAutoRepair = function()
 end
 
 -- =================================================================
--- LÓGICA DE COMPRA ESCANEO (CORE)
+-- LÓGICA DE COMPRA ESCANEO (CORE V5.8)
 -- =================================================================
 local function isCarInQueue(carModel)
     for _, item in ipairs(autoBuyCarQueue) do if item.car == carModel then return true end end
@@ -510,11 +509,12 @@ scanExistingCars = function()
             if cd then 
                 local percent = 100 
                 local wearValue = carModel:GetAttribute("Wear")
-                if wearValue then percent = math.floor(wearValue * 100) end
+                -- FIX: No usar floor para no perder decimales como 0.05
+                if wearValue then percent = wearValue * 100 end
                 
                 if percent <= VIP_THRESHOLD then
                     table.insert(autoBuyCarQueue, {car = carModel, percent = percent})
-                    Rayfield:Notify({Title = "VIP Encontrado", Content = "Auto detectado con " .. percent .. "%", Duration = 3})
+                    Rayfield:Notify({Title = "VIP Encontrado", Content = "Auto: " .. percent .. "%", Duration = 3})
                 end
             end
         end
@@ -587,4 +587,31 @@ spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "V5.7 Lista", Content = "Distancia segura aplicada.", Duration = 5})
+-- FIX EVENTOS PARA DECIMALES
+if displayMessageEvent then
+    displayMessageEvent.OnClientEvent:Connect(function(...)
+        if currentMode ~= "BUY" then return end 
+        local args = {...}; local text = args[2]
+        if not text or type(text) ~= "string" then return end
+         
+        -- FIX: Regex mejorada para capturar puntos decimales (0.05%)
+        local percentStr = text:match("([%d%.]+)%%")
+        local model = text:match("([%w%s]+) has appeared") or text:match("([%w%s]+)%s*[%d%.]+%%")
+
+        if percentStr and model then
+            local percent = tonumber(percentStr)
+            if percent and percent <= VIP_THRESHOLD then
+                task.wait(0.5)
+                local children = VEHICLES_FOLDER:GetChildren()
+                local lastCar = children[#children]
+                if lastCar and lastCar:IsA("Model") and not isCarInQueue(lastCar) then
+                    Rayfield:Notify({Title = "Evento VIP", Content = "Auto: " .. percent .. "%", Duration = 4})
+                    table.insert(autoBuyCarQueue, {car = lastCar, percent = percent})  
+                    updateStatus("Cola VIP: " .. #autoBuyCarQueue)
+                end
+            end
+        end
+    end)
+end
+
+Rayfield:Notify({Title = "V5.8 Lista", Content = "Soporte Decimal y Pintura Fija", Duration = 5})
