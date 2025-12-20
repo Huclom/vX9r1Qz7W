@@ -1,19 +1,27 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V5.8): "DECIMAL PRECISION" ---
--- --- FIX: Ahora detecta porcentajes decimales (ej: 0.05%) ---
+-- --- SCRIPT MAESTRO (V5.9): "STRICT REPAIR" ---
+-- --- FIX: No abandona la reparación hasta que el Wear sea 0% ---
 -- =================================================================
+
+-- >>> SISTEMA ANTI-OVERLAP (Evita doble ejecución) <<<
+if getgenv().MechanicFarmRunning then
+    print("⚠️ DETECTADA INSTANCIA PREVIA: Intentando detenerla...")
+    getgenv().MechanicFarmRunning = false
+    task.wait(1)
+end
+getgenv().MechanicFarmRunning = true
 
 -- Cargar Rayfield Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "FIX IT UP | Auto-Farm V5.8",
-   LoadingTitle = "Cargando Soporte Decimal...",
-   LoadingSubtitle = "by RevSeba",
+   Name = "Mechanic Tycoon | Auto-Farm V5.9",
+   LoadingTitle = "Modo Estricto Activado...",
+   LoadingSubtitle = "by Gemini & Sebastian",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV58"
+      FileName = "ManagerV59"
    },
    Discord = {
       Enabled = false,
@@ -69,7 +77,6 @@ local remoteLoad = getRemote(RS_Events:WaitForChild("Vehicles", 10), "RemoteLoad
 local displayMessageEvent = getRemote(RS_Events, "DisplayMessage")
 local NOTIFY_REMOTE = RS_Events:FindFirstChild("HUD") and RS_Events.HUD:FindFirstChild("Notifiy")
 local setPaintEvent = RS_Events:FindFirstChild("Vehicles") and RS_Events.Vehicles:FindFirstChild("SetPaint")
-
 local CONFIRM_REMOTE = RS_Events:FindFirstChild("HUD") and RS_Events.HUD:FindFirstChild("Confirmation")
 local VEHICLES_FOLDER = Workspace:WaitForChild("Vehicles", 10)
 
@@ -114,7 +121,7 @@ local MainToggle = TabFarm:CreateToggle({
 
 local VIPSlider = TabSettings:CreateSlider({
    Name = "Porcentaje VIP Máximo",
-   Range = {0.1, 30}, -- Permitimos decimales en el slider si Rayfield lo soporta, o enteros
+   Range = {0.1, 30},
    Increment = 1,
    Suffix = "%",
    CurrentValue = 10,
@@ -248,7 +255,7 @@ if NOTIFY_REMOTE then
 end
 
 -- =================================================================
--- LÓGICA DE REPARACIÓN (V5.8)
+-- LÓGICA DE REPARACIÓN (V5.9 STRICT)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -269,201 +276,227 @@ startAutoRepair = function()
     end
     if not targetCar then isRepairRunning = false; return end
 
-    isRepairRunning = true
-    updateStatus("REPARANDO: Iniciando proceso...")
+    isRepairRunning = true -- BLOQUEO: Activamos el estado de reparación
+    updateStatus("REPARANDO: Iniciando proceso estricto...")
 
     local carModel = targetCar 
     local machineMap = { ["Battery"]="BatteryCharger", ["AirIntake"]="PartsWasher", ["Radiator"]="PartsWasher", ["CylinderHead"]="GrindingMachine", ["EngineBlock"]="GrindingMachine", ["ExhaustManifold"] = "GrindingMachine", ["Suspension"]="GrindingMachine", ["Alternator"]="GrindingMachine", ["Transmission"]="GrindingMachine" }
 
-    local function getPitStop()
-        local map = Workspace:WaitForChild("Map")
-        local pitStopPosition = Vector3.new(-981.30127, 18.0568581, -129.036621)
-        local closest = nil; local minDst = math.huge
-        for _, child in ipairs(map:GetChildren()) do
-            if child.Name == "PitStop Repair" then
-                local d = (child:GetPivot().Position - pitStopPosition).Magnitude
-                if d < minDst then minDst = d; closest = child end
-            end
-        end; return closest
-    end
-     
-    local pitStop = getPitStop()
-    if not pitStop then isRepairRunning = false; return end
-    
-    rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
-    task.wait(2) 
-
-    local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
-    if #moveablePartsFolder:GetChildren() > 0 then
-        updateStatus("REPARANDO: Limpiando zona...")
-        for i=1,3 do if tryClickButtonByName("bring dropped parts") then task.wait(1.5); break end; task.wait(0.5) end
-        for i=1,5 do
-            if tryClickButtonByName("delete dropped parts") then
-                for j = 1, 8 do if #moveablePartsFolder:GetChildren() == 0 then break end; task.wait(1) end
-                break
-            end
-            task.wait(0.5)
+    -- BUCLE DE REPARACIÓN ESTRICTA (V5.9)
+    -- Se repetirá hasta que el auto tenga 0% de desgaste o deje de existir
+    while isRepairRunning and carModel.Parent do
+        
+        local currentWear = carModel:GetAttribute("Wear") or 0
+        if currentWear <= 0 then
+            print("✅ AUTO PERFECTO (0% Wear). Saliendo del bucle.")
+            break 
         end
-    end
-     
-    updateStatus("REPARANDO: Analizando motor...")
-    local carPartsEvent = carModel:WaitForChild("PartsEvent", 10)
-    local engineBay = carModel:FindFirstChild("Body", true) 
-    if engineBay then engineBay = engineBay:FindFirstChild("EngineBay", true) or engineBay end
-    local carValuesFolder = carModel:FindFirstChild("Values", true)
-    if carValuesFolder then carValuesFolder = carValuesFolder:FindFirstChild("Engine", true) or carValuesFolder end
-     
-    if not carPartsEvent or not engineBay or not carValuesFolder then isRepairRunning = false; return end
+        
+        updateStatus("REPARANDO: Ciclo activo (Wear: "..(currentWear*100).."%)")
 
-    local allPartNames, partsToRepair_Names, partsToBuy_Data, droppedPartNameMap = {}, {}, {}, {}
-    local engineType = carValuesFolder:FindFirstChild("EngineBlock") and carValuesFolder.EngineBlock.Value or ""
+        -- 1. TELEPORT AL PIT
+        local function getPitStop()
+            local map = Workspace:WaitForChild("Map")
+            local pitStopPosition = Vector3.new(-981.30127, 18.0568581, -129.036621)
+            local closest = nil; local minDst = math.huge
+            for _, child in ipairs(map:GetChildren()) do
+                if child.Name == "PitStop Repair" then
+                    local d = (child:GetPivot().Position - pitStopPosition).Magnitude
+                    if d < minDst then minDst = d; closest = child end
+                end
+            end; return closest
+        end
+         
+        local pitStop = getPitStop()
+        if not pitStop then isRepairRunning = false; return end
+        
+        rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
+        task.wait(1) 
 
-    for _, partModel in ipairs(engineBay:GetChildren()) do
-        if partModel:IsA("Model") and partModel:FindFirstChild("Main") then
-            local fullPartName = partModel.Name 
-            local basePartName = fullPartName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
-            local droppedName = basePartName 
-             
-            local valueObj = carValuesFolder:FindFirstChild(basePartName)
-            if valueObj and valueObj:IsA("StringValue") then
-                local splitVal = string.split(valueObj.Value, "|")
-                if #splitVal >= 2 then droppedName = splitVal[2] end
-            end
-            droppedPartNameMap[fullPartName] = droppedName
-            table.insert(allPartNames, fullPartName) 
-             
-            if machineMap[basePartName] or basePartName:find("Transmission") then
-                table.insert(partsToRepair_Names, fullPartName)
-            else
-                local partString = "ENGINE|" .. engineType .. "|" .. droppedName
-                table.insert(partsToBuy_Data, partString)
+        -- 2. LIMPIEZA
+        local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
+        if #moveablePartsFolder:GetChildren() > 0 then
+            for i=1,3 do if tryClickButtonByName("bring dropped parts") then task.wait(1); break end; task.wait(0.5) end
+            for i=1,5 do
+                if tryClickButtonByName("delete dropped parts") then
+                    for j = 1, 8 do if #moveablePartsFolder:GetChildren() == 0 then break end; task.wait(1) end
+                    break
+                end
+                task.wait(0.5)
             end
         end
-    end
-     
-    for _, partName in ipairs(allPartNames) do 
-        if not isRepairRunning then break end
-        pcall(function() carPartsEvent:FireServer("RemovePart", partName) end)
-        task.wait(0.1) 
-    end
-    task.wait(1.5) 
-    tryClickButtonByName("bring dropped parts")
-    task.wait(2)
-     
-    local shopFolder = Workspace:WaitForChild("PartsStore"):WaitForChild("SpareParts"):WaitForChild("Parts")
-    local function do_parallel_buy()
-        for _, partString in ipairs(partsToBuy_Data) do
+         
+        -- 3. ANÁLISIS
+        local carPartsEvent = carModel:WaitForChild("PartsEvent", 10)
+        local engineBay = carModel:FindFirstChild("Body", true) 
+        if engineBay then engineBay = engineBay:FindFirstChild("EngineBay", true) or engineBay end
+        local carValuesFolder = carModel:FindFirstChild("Values", true)
+        if carValuesFolder then carValuesFolder = carValuesFolder:FindFirstChild("Engine", true) or carValuesFolder end
+         
+        if not carPartsEvent or not engineBay or not carValuesFolder then 
+            updateStatus("Error: No se leen piezas. Reintentando...")
+            task.wait(2)
+            continue -- Reinicia el bucle si falla lectura
+        end
+
+        local allPartNames, partsToRepair_Names, partsToBuy_Data, droppedPartNameMap = {}, {}, {}, {}
+        local engineType = carValuesFolder:FindFirstChild("EngineBlock") and carValuesFolder.EngineBlock.Value or ""
+        
+        -- Escaneo de piezas
+        for _, partModel in ipairs(engineBay:GetChildren()) do
+            if partModel:IsA("Model") and partModel:FindFirstChild("Main") then
+                local fullPartName = partModel.Name 
+                local basePartName = fullPartName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
+                local droppedName = basePartName 
+                 
+                local valueObj = carValuesFolder:FindFirstChild(basePartName)
+                if valueObj and valueObj:IsA("StringValue") then
+                    local splitVal = string.split(valueObj.Value, "|")
+                    if #splitVal >= 2 then droppedName = splitVal[2] end
+                end
+                droppedPartNameMap[fullPartName] = droppedName
+                table.insert(allPartNames, fullPartName) 
+                 
+                if machineMap[basePartName] or basePartName:find("Transmission") then
+                    table.insert(partsToRepair_Names, fullPartName)
+                else
+                    local partString = "ENGINE|" .. engineType .. "|" .. droppedName
+                    table.insert(partsToBuy_Data, partString)
+                end
+            end
+        end
+         
+        -- 4. DESMONTAJE
+        for _, partName in ipairs(allPartNames) do 
             if not isRepairRunning then break end
-            local split = string.split(partString, "|")
-            local itemCD = shopFolder:FindFirstChild(split[2], true) and shopFolder:FindFirstChild(split[2], true):FindFirstChild(split[3], true) and shopFolder:FindFirstChild(split[2], true):FindFirstChild(split[3], true):FindFirstChild("ClickDetector", true)
-            if itemCD then fireclickdetector(itemCD); task.wait(0.5) end
+            pcall(function() carPartsEvent:FireServer("RemovePart", partName) end)
+            task.wait(0.1) 
         end
-        return true
-    end
+        task.wait(1.5) 
+        tryClickButtonByName("bring dropped parts")
+        task.wait(2)
+         
+        -- 5. REPARACIÓN PARALELA
+        local shopFolder = Workspace:WaitForChild("PartsStore"):WaitForChild("SpareParts"):WaitForChild("Parts")
+        local function do_parallel_buy()
+            for _, partString in ipairs(partsToBuy_Data) do
+                if not isRepairRunning then break end
+                local split = string.split(partString, "|")
+                local itemCD = shopFolder:FindFirstChild(split[2], true) and shopFolder:FindFirstChild(split[2], true):FindFirstChild(split[3], true) and shopFolder:FindFirstChild(split[2], true):FindFirstChild(split[3], true):FindFirstChild("ClickDetector", true)
+                if itemCD then fireclickdetector(itemCD); task.wait(0.5) end
+            end
+            return true
+        end
 
-    local machinePools = { BatteryCharger = {}, GrindingMachine = {}, PartsWasher = {} }
-    local machineClickDetectors = {} 
-    for _, machine in ipairs(pitStop:GetChildren()) do
-        local cd = nil
-        if machine.Name == "BatteryCharger" or machine.Name == "GrindingMachine" then
-            cd = machine:FindFirstChild("Button", true) and machine:FindFirstChild("Button", true):FindFirstChild("ClickDetector")
-        elseif machine.Name == "PartsWasher" then
-            cd = machine:FindFirstChild("Faucet", true) and machine:FindFirstChild("Faucet", true):FindFirstChild("ClickDetector")
+        local machinePools = { BatteryCharger = {}, GrindingMachine = {}, PartsWasher = {} }
+        local machineClickDetectors = {} 
+        for _, machine in ipairs(pitStop:GetChildren()) do
+            local cd = nil
+            if machine.Name == "BatteryCharger" or machine.Name == "GrindingMachine" then
+                cd = machine:FindFirstChild("Button", true) and machine:FindFirstChild("Button", true):FindFirstChild("ClickDetector")
+            elseif machine.Name == "PartsWasher" then
+                cd = machine:FindFirstChild("Faucet", true) and machine:FindFirstChild("Faucet", true):FindFirstChild("ClickDetector")
+            end
+            if cd and machinePools[machine.Name] then
+                table.insert(machinePools[machine.Name], machine)
+                machineClickDetectors[machine] = cd
+            end
         end
-        if cd and machinePools[machine.Name] then
-            table.insert(machinePools[machine.Name], machine)
-            machineClickDetectors[machine] = cd
-        end
-    end
-    local machineIndexes = { BatteryCharger = 1, GrindingMachine = 1, PartsWasher = 1 }
+        local machineIndexes = { BatteryCharger = 1, GrindingMachine = 1, PartsWasher = 1 }
 
-    local function do_parallel_repair()
-        local partsBeingRepaired = {} 
-        for _, partSlotName in ipairs(partsToRepair_Names) do
-            if not isRepairRunning then break end 
-            local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
-            local partObject = moveablePartsFolder:FindFirstChild(targetDroppedName)
-             
-            if partObject then
-                local wear = partObject:GetAttribute("Wear") or 0
-                if wear > 0 then
-                    local basePartName = partSlotName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
-                    if basePartName:find("Transmission") then basePartName = "Transmission" end
-                    local machineName = machineMap[basePartName]
-                    local pool = machinePools[machineName]
-                    if pool and #pool > 0 then
-                        local idx = machineIndexes[machineName]
-                        local machine = pool[idx]
-                        if not machine then continue end
-                        machineIndexes[machineName] = (idx % #pool) + 1
-                         
-                        local detectorPad = machine:FindFirstChild("Detector", true)
-                        if detectorPad then
-                            partObject:PivotTo(detectorPad.CFrame * CFrame.new(0, 0.5, 0))
-                            task.wait(0.2)
-                            fireclickdetector(machineClickDetectors[machine])
-                            table.insert(partsBeingRepaired, { Part = partObject, StartTime = os.clock(), Machine = machine, CD = machineClickDetectors[machine] })
+        local function do_parallel_repair()
+            local partsBeingRepaired = {} 
+            for _, partSlotName in ipairs(partsToRepair_Names) do
+                if not isRepairRunning then break end 
+                local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
+                local partObject = moveablePartsFolder:FindFirstChild(targetDroppedName)
+                 
+                if partObject then
+                    local wear = partObject:GetAttribute("Wear") or 0
+                    if wear > 0 then
+                        local basePartName = partSlotName:gsub(engineType, ""):gsub("^-", ""):gsub("^_", ""):gsub("-$", ""):gsub("_$", "")
+                        if basePartName:find("Transmission") then basePartName = "Transmission" end
+                        local machineName = machineMap[basePartName]
+                        local pool = machinePools[machineName]
+                        if pool and #pool > 0 then
+                            local idx = machineIndexes[machineName]
+                            local machine = pool[idx]
+                            if not machine then continue end
+                            machineIndexes[machineName] = (idx % #pool) + 1
+                             
+                            local detectorPad = machine:FindFirstChild("Detector", true)
+                            if detectorPad then
+                                partObject:PivotTo(detectorPad.CFrame * CFrame.new(0, 0.5, 0))
+                                task.wait(0.2)
+                                fireclickdetector(machineClickDetectors[machine])
+                                table.insert(partsBeingRepaired, { Part = partObject, StartTime = os.clock(), Machine = machine, CD = machineClickDetectors[machine] })
+                            end
                         end
                     end
                 end
-            end
-        end 
-
-        while #partsBeingRepaired > 0 and isRepairRunning do 
-            task.wait(0.5) 
-            for i = #partsBeingRepaired, 1, -1 do 
-                local data = partsBeingRepaired[i]
-                if not data.Machine or not data.Part or not data.Part.Parent then table.remove(partsBeingRepaired, i); continue end
-                local wear = data.Part:GetAttribute("Wear") or 0
-                if wear == 0 then
-                    table.remove(partsBeingRepaired, i)
-                elseif (os.clock() - data.StartTime) > 20 then
-                    data.StartTime = os.clock()
-                    local detectorPad = data.Machine:FindFirstChild("Detector", true)
-                    if detectorPad then
-                        data.Part:PivotTo(detectorPad.CFrame * CFrame.new(0, 0.5, 0))
-                        fireclickdetector(data.CD)
-                    end
-                end
             end 
-        end 
-        return true
-    end
 
-    local buy_done = false; local repair_done = false
-    task.spawn(function() buy_done = do_parallel_buy() end)
-    task.spawn(function() repair_done = do_parallel_repair() end)
-    while not (buy_done and repair_done) and isRepairRunning do task.wait(0.5) end
-    if not isRepairRunning then return end
+            while #partsBeingRepaired > 0 and isRepairRunning do 
+                task.wait(0.5) 
+                for i = #partsBeingRepaired, 1, -1 do 
+                    local data = partsBeingRepaired[i]
+                    if not data.Machine or not data.Part or not data.Part.Parent then table.remove(partsBeingRepaired, i); continue end
+                    local wear = data.Part:GetAttribute("Wear") or 0
+                    if wear == 0 then
+                        table.remove(partsBeingRepaired, i)
+                    elseif (os.clock() - data.StartTime) > 20 then
+                        data.StartTime = os.clock()
+                        local detectorPad = data.Machine:FindFirstChild("Detector", true)
+                        if detectorPad then
+                            data.Part:PivotTo(detectorPad.CFrame * CFrame.new(0, 0.5, 0))
+                            fireclickdetector(data.CD)
+                        end
+                    end
+                end 
+            end 
+            return true
+        end
 
-    updateStatus("REPARANDO: Ensamblando...")
-    for _, partSlotName in ipairs(allPartNames) do
-        if not isRepairRunning then break end 
-        local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
-        local partToInstall = nil
-        for _, p in ipairs(moveablePartsFolder:GetChildren()) do
-            local wear = p:GetAttribute("Wear") or 0
-            if wear == 0 and p.Name == targetDroppedName then
-                partToInstall = p; break
+        local buy_done = false; local repair_done = false
+        task.spawn(function() buy_done = do_parallel_buy() end)
+        task.spawn(function() repair_done = do_parallel_repair() end)
+        while not (buy_done and repair_done) and isRepairRunning do task.wait(0.5) end
+        if not isRepairRunning then return end
+
+        -- 6. ENSAMBLAJE
+        updateStatus("REPARANDO: Ensamblando...")
+        for _, partSlotName in ipairs(allPartNames) do
+            if not isRepairRunning then break end 
+            local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
+            local partToInstall = nil
+            for _, p in ipairs(moveablePartsFolder:GetChildren()) do
+                local wear = p:GetAttribute("Wear") or 0
+                if wear == 0 and p.Name == targetDroppedName then
+                    partToInstall = p; break
+                end
+            end
+            if partToInstall then
+                pcall(function() carPartsEvent:FireServer("ReapplyPart", partToInstall, partSlotName) end)
+                task.wait(0.15)
             end
         end
-        if partToInstall then
-            pcall(function() carPartsEvent:FireServer("ReapplyPart", partToInstall, partSlotName) end)
-            task.wait(0.15)
-        end
+        
+        task.wait(1)
+        -- Al final del bucle, verificará el WEAR nuevamente.
+        -- Si no es 0, volverá a empezar todo el proceso.
     end
 
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel.Misc:FindFirstChild("Hood", true) and carModel.Misc.Hood:FindFirstChild("Detector", true) and carModel.Misc.Hood.Detector:FindFirstChild("ClickDetector")
     if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
     
-    -- >>> SECCIÓN DE PINTURA (V5.8) <<<
+    -- >>> SECCIÓN DE PINTURA (V5.9) <<<
     local paintArea = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint")
     local paintPrompt = paintArea:FindFirstChild("Prompt", true) and paintArea:FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
     
     if paintPrompt and setPaintEvent then
         updateStatus("Finalizando (Pintura)...")
         
-        -- 1. Nos movemos AL LADO del auto (Proximidad para pintar)
+        -- Proximidad al auto
         if carModel and carModel.PrimaryPart then
             rootPart.CFrame = carModel:GetPivot() * CFrame.new(5, 0, 0)
         elseif carModel and carModel:FindFirstChild("DriveSeat") then
@@ -471,12 +504,9 @@ startAutoRepair = function()
         end
         
         task.wait(0.5)
-        
-        -- 2. Activamos botón remotamente
         fireproximityprompt(paintPrompt)
         task.wait(0.5) 
         
-        -- 3. Pintamos
         pcall(function() 
             setPaintEvent:FireServer("Car", carModel, Color3.fromHSV(math.random(), 1, 1)) 
             print("🖌️ PINTURA ÉXITO: Método 'Car' enviado.")
@@ -486,13 +516,13 @@ startAutoRepair = function()
         task.wait(2)
     end
      
-    isRepairRunning = false
+    isRepairRunning = false -- Solo AQUI liberamos el script para comprar de nuevo
     updateStatus("REPARACIÓN COMPLETADA")
     Rayfield:Notify({Title = "Trabajo Terminado", Content = "Ciclo finalizado.", Duration = 3})
 end
 
 -- =================================================================
--- LÓGICA DE COMPRA ESCANEO (CORE V5.8)
+-- LÓGICA DE COMPRA ESCANEO (CORE V5.9)
 -- =================================================================
 local function isCarInQueue(carModel)
     for _, item in ipairs(autoBuyCarQueue) do if item.car == carModel then return true end end
@@ -509,7 +539,6 @@ scanExistingCars = function()
             if cd then 
                 local percent = 100 
                 local wearValue = carModel:GetAttribute("Wear")
-                -- FIX: No usar floor para no perder decimales como 0.05
                 if wearValue then percent = wearValue * 100 end
                 
                 if percent <= VIP_THRESHOLD then
@@ -523,9 +552,9 @@ scanExistingCars = function()
 end
 
 spawn(function()
-    while true do
+    while getgenv().MechanicFarmRunning do
         task.wait(1)
-        if isRepairRunning then continue end
+        if isRepairRunning then continue end -- Si estamos reparando, IGNORAR la cola
         if currentMode ~= "BUY" or #autoBuyCarQueue == 0 or isAutoBuyCarBuying then continue end
 
         isAutoBuyCarBuying = true
@@ -587,14 +616,12 @@ spawn(function()
     end
 end)
 
--- FIX EVENTOS PARA DECIMALES
 if displayMessageEvent then
     displayMessageEvent.OnClientEvent:Connect(function(...)
         if currentMode ~= "BUY" then return end 
         local args = {...}; local text = args[2]
         if not text or type(text) ~= "string" then return end
          
-        -- FIX: Regex mejorada para capturar puntos decimales (0.05%)
         local percentStr = text:match("([%d%.]+)%%")
         local model = text:match("([%w%s]+) has appeared") or text:match("([%w%s]+)%s*[%d%.]+%%")
 
@@ -614,4 +641,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "V5.8 Lista", Content = "Soporte Decimal y Pintura Fija", Duration = 5})
+Rayfield:Notify({Title = "V5.9 Estricta", Content = "Reparación Bloqueada Activada", Duration = 5})
