@@ -1,19 +1,19 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V5.0): "RAYFIELD EDITION" ---
--- --- Integración UI Profesional + Lógica VIP ---
+-- --- SCRIPT MAESTRO (V5.2): "LIVE REF FIX" ---
+-- --- FIX: Obtiene una referencia fresca del auto al pintar para evitar error NIL ---
 -- =================================================================
 
 -- Cargar Rayfield Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mechanic Tycoon | Auto-Farm V5.0",
-   LoadingTitle = "Cargando Sistema...",
+   Name = "Mechanic Tycoon | Auto-Farm V5.2",
+   LoadingTitle = "Cargando Fix de Referencia...",
    LoadingSubtitle = "by Gemini & Sebastian",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "Manager"
+      FileName = "ManagerV52"
    },
    Discord = {
       Enabled = false,
@@ -44,7 +44,7 @@ local autoBuyCarQueue = {}
 local isRepairRunning = false 
 local FAIL_DELAY = 5 
 local CLEAN_DELAY = 10 
-local VIP_THRESHOLD = 10 -- Valor por defecto, se actualiza con el Slider
+local VIP_THRESHOLD = 10 
 
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
 local AUTOS_PARA_VENDER = {
@@ -68,7 +68,10 @@ end
 local remoteLoad = getRemote(RS_Events:WaitForChild("Vehicles", 10), "RemoteLoad")
 local displayMessageEvent = getRemote(RS_Events, "DisplayMessage")
 local NOTIFY_REMOTE = RS_Events:FindFirstChild("HUD") and RS_Events.HUD:FindFirstChild("Notifiy")
+
+-- Confirmado por RemoteSpy: La ruta es correcta
 local setPaintEvent = RS_Events:FindFirstChild("Vehicles") and RS_Events.Vehicles:FindFirstChild("SetPaint")
+
 local CONFIRM_REMOTE = RS_Events:FindFirstChild("HUD") and RS_Events.HUD:FindFirstChild("Confirmation")
 local VEHICLES_FOLDER = Workspace:WaitForChild("Vehicles", 10)
 
@@ -80,13 +83,12 @@ local startAutoSellLoop
 local startAutoRepair
 
 -- =================================================================
--- INTERFAZ RAYFIELD (PESTAÑAS)
+-- INTERFAZ RAYFIELD
 -- =================================================================
-local TabFarm = Window:CreateTab("Auto Farm", 4483362458) -- Icono genérico
+local TabFarm = Window:CreateTab("Auto Farm", 4483362458) 
 local TabSettings = Window:CreateTab("Ajustes", 4483362458)
 local TabManual = Window:CreateTab("Manual", 4483362458)
 
--- ELEMENTOS UI --
 local StatusParagraph = TabFarm:CreateParagraph({Title = "Estado Actual", Content = "Esperando inicio..."})
 
 local function updateStatus(text)
@@ -173,15 +175,10 @@ local function tryClickButtonByName(text)
     return false
 end
 
--- Botones Manuales
 TabManual:CreateButton({
-   Name = "Limpiar Piezas del Suelo (Trash)",
+   Name = "Limpiar Drop (Manual)",
    Callback = function()
-        if tryClickButtonByName("delete dropped parts") then
-            Rayfield:Notify({Title = "Limpieza", Content = "Click enviado a borrar piezas.", Duration = 3})
-        else
-            Rayfield:Notify({Title = "Error", Content = "Botón no encontrado en pantalla.", Duration = 3})
-        end
+        tryClickButtonByName("delete dropped parts")
    end,
 })
 
@@ -239,7 +236,6 @@ startAutoSellLoop = function()
     task.spawn(scanExistingCars)
 end
 
--- Monitor de Garaje Lleno
 if NOTIFY_REMOTE then
     NOTIFY_REMOTE.OnClientEvent:Connect(function(text)
         if text == "Garage limit reached" then 
@@ -253,13 +249,12 @@ if NOTIFY_REMOTE then
 end
 
 -- =================================================================
--- LÓGICA DE REPARACIÓN
+-- LÓGICA DE REPARACIÓN (V5.2 - Live Reference)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
     local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     
-    -- Seleccionar auto propio más cercano
     local targetCar = nil
     for i = 1, 10 do 
         if currentMode ~= "BUY" then return end 
@@ -278,7 +273,7 @@ startAutoRepair = function()
     isRepairRunning = true
     updateStatus("REPARANDO: Iniciando proceso...")
 
-    -- Configuración de máquinas y pits
+    -- Guardamos la referencia inicial SOLO para reparaciones, no para pintura final
     local carModel = targetCar 
     local machineMap = { ["Battery"]="BatteryCharger", ["AirIntake"]="PartsWasher", ["Radiator"]="PartsWasher", ["CylinderHead"]="GrindingMachine", ["EngineBlock"]="GrindingMachine", ["ExhaustManifold"] = "GrindingMachine", ["Suspension"]="GrindingMachine", ["Alternator"]="GrindingMachine", ["Transmission"]="GrindingMachine" }
 
@@ -300,7 +295,7 @@ startAutoRepair = function()
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(2) 
 
-    -- Limpieza inicial
+    -- LIMPIEZA
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     if #moveablePartsFolder:GetChildren() > 0 then
         updateStatus("REPARANDO: Limpiando zona...")
@@ -314,6 +309,7 @@ startAutoRepair = function()
         end
     end
      
+    -- ANÁLISIS
     updateStatus("REPARANDO: Analizando motor...")
     local carPartsEvent = carModel:WaitForChild("PartsEvent", 10)
     local engineBay = carModel:FindFirstChild("Body", true) 
@@ -326,7 +322,6 @@ startAutoRepair = function()
     local allPartNames, partsToRepair_Names, partsToBuy_Data, droppedPartNameMap = {}, {}, {}, {}
     local engineType = carValuesFolder:FindFirstChild("EngineBlock") and carValuesFolder.EngineBlock.Value or ""
 
-    -- Clasificación de piezas
     for _, partModel in ipairs(engineBay:GetChildren()) do
         if partModel:IsA("Model") and partModel:FindFirstChild("Main") then
             local fullPartName = partModel.Name 
@@ -350,7 +345,7 @@ startAutoRepair = function()
         end
     end
      
-    -- Desarmar
+    -- DESMONTAJE
     for _, partName in ipairs(allPartNames) do 
         if not isRepairRunning then break end
         pcall(function() carPartsEvent:FireServer("RemovePart", partName) end)
@@ -360,7 +355,7 @@ startAutoRepair = function()
     tryClickButtonByName("bring dropped parts")
     task.wait(2)
      
-    -- Funciones Paralelas (Compra y Reparación)
+    -- PARALELO (COMPRA/REPARACIÓN)
     local shopFolder = Workspace:WaitForChild("PartsStore"):WaitForChild("SpareParts"):WaitForChild("Parts")
     local function do_parallel_buy()
         for _, partString in ipairs(partsToBuy_Data) do
@@ -447,7 +442,7 @@ startAutoRepair = function()
     while not (buy_done and repair_done) and isRepairRunning do task.wait(0.5) end
     if not isRepairRunning then return end
 
-    -- Reensamblar
+    -- ENSAMBLAJE
     updateStatus("REPARANDO: Ensamblando...")
     for _, partSlotName in ipairs(allPartNames) do
         if not isRepairRunning then break end 
@@ -465,17 +460,52 @@ startAutoRepair = function()
         end
     end
 
-    -- Finalizar (Capó y Pintura)
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel.Misc:FindFirstChild("Hood", true) and carModel.Misc.Hood:FindFirstChild("Detector", true) and carModel.Misc.Hood.Detector:FindFirstChild("ClickDetector")
     if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
     
+    -- >>> SECCIÓN DE PINTURA (V5.2) <<<
+    -- FIX: Escaneamos de nuevo el auto para obtener una referencia fresca y no NIL
     local paintPrompt = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint"):FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
-    if paintPrompt and setPaintEvent then
+    
+    if paintPrompt then
+        updateStatus("Pintando... (V5.2 Fix)")
+        
+        -- Nos sentamos primero para asegurar posición
         local carSeat = carModel:FindFirstChild("DriveSeat") or carModel:FindFirstChildOfClass("BasePart", true)
         if carSeat then rootPart.CFrame = carSeat.CFrame * CFrame.new(0, 3, 15); task.wait(1) end
+        
         pcall(fireproximityprompt, paintPrompt, 0)
-        task.wait(0.5)
-        pcall(function() setPaintEvent:FireServer(carModel, Color3.fromHSV(math.random(), 1, 1)) end)
+        task.wait(1)
+        
+        local clickedUI = tryClickButtonByName("Confirm") or tryClickButtonByName("Yes") or tryClickButtonByName("Paint")
+        
+        if setPaintEvent then
+            -- >>> AQUÍ ESTÁ EL CAMBIO IMPORTANTE <<<
+            -- Buscamos el auto que esté más cerca del área de pintura AHORA MISMO
+            local freshCarModel = nil
+            local minPaintDist = 20
+            local paintAreaPos = paintPrompt.Parent.Position -- Asumimos que el prompt está cerca del auto
+            
+            for _, c in pairs(VEHICLES_FOLDER:GetChildren()) do
+                if c:IsA("Model") and c:GetPivot() then
+                    local d = (c:GetPivot().Position - rootPart.Position).Magnitude
+                    if d < minPaintDist then
+                        minPaintDist = d
+                        freshCarModel = c
+                    end
+                end
+            end
+            
+            if freshCarModel then
+                -- Enviamos el evento con el auto FRESCO
+                pcall(function() 
+                    setPaintEvent:FireServer(freshCarModel, Color3.fromHSV(math.random(), 1, 1)) 
+                    print("🖌️ V5.2: Pintura enviada a " .. freshCarModel.Name)
+                end)
+            else
+                warn("No se encontró auto cercano para pintar (Live Ref Failed)")
+            end
+        end
         task.wait(2)
     end
      
@@ -514,7 +544,6 @@ scanExistingCars = function()
     updateStatus("Cola VIP: " .. #autoBuyCarQueue .. " autos")
 end
 
--- Bucle de Compra
 spawn(function()
     while true do
         task.wait(1)
@@ -531,7 +560,6 @@ spawn(function()
             isAutoBuyCarBuying = false; if #autoBuyCarQueue == 0 then task.spawn(scanExistingCars) end; continue
         end
 
-        -- Limpieza
         updateStatus("Limpiando área ("..CLEAN_DELAY.."s)...")
         if tryClickButtonByName("delete dropped parts") then
             for k=1, CLEAN_DELAY do
@@ -542,7 +570,6 @@ spawn(function()
          
         if currentMode ~= "BUY" then isAutoBuyCarBuying = false; continue end
 
-        -- Teletransporte y Click
         local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
         if root then
             root.CFrame = carToBuy:GetPivot() * CFrame.new(-8, 0, 0)
@@ -582,7 +609,6 @@ spawn(function()
     end
 end)
 
--- Eventos de Juego
 if displayMessageEvent then
     displayMessageEvent.OnClientEvent:Connect(function(...)
         if currentMode ~= "BUY" then return end 
@@ -608,4 +634,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "Sistema Listo", Content = "V5.0 Rayfield cargada correctamente.", Duration = 5})
+Rayfield:Notify({Title = "V5.2 Fix", Content = "Fix de referencia fantasma aplicado.", Duration = 5})
