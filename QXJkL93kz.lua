@@ -15,9 +15,9 @@ getgenv().MechanicFarmRunning = true
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mechanic Tycoon | Auto-Farm V5.9",
+   Name = "FIX IT UP | Auto-Farm V5.9",
    LoadingTitle = "Modo Estricto Activado...",
-   LoadingSubtitle = "by Gemini & Sebastian",
+   LoadingSubtitle = "by RevSeba",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
@@ -642,3 +642,4 @@ if displayMessageEvent then
 end
 
 Rayfield:Notify({Title = "V5.9 Estricta", Content = "Reparación Bloqueada Activada", Duration = 5})
+
