@@ -13,9 +13,9 @@ getgenv().MechanicFarmRunning = true
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mechanic Tycoon | Auto-Farm V6.7",
+   Name = "FIX IT UP | Auto-Farm V6.7",
    LoadingTitle = "Restaurando Venta Clásica...",
-   LoadingSubtitle = "by Gemini & Sebastian",
+   LoadingSubtitle = "by RevSeba",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
@@ -589,3 +589,4 @@ if displayMessageEvent then
 end
 
 Rayfield:Notify({Title = "V6.7 Final", Content = "Venta clásica + Reparación óptima.", Duration = 5})
+
