@@ -1,19 +1,19 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V5.5): "REMOTE PAINT" ---
--- --- FIX: Pinta a distancia sin mover al personaje ("Car", Model, Color) ---
+-- --- SCRIPT MAESTRO (V5.7): "PROXIMITY FIX" ---
+-- --- FIX: Se para al lado del auto y detona la pintura remotamente ---
 -- =================================================================
 
 -- Cargar Rayfield Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "FIX IT UP! | Auto-Farm V5.5",
-   LoadingTitle = "Optimización de Pintura...",
+   Name = "FIX IT UP! | Auto-Farm V5.7",
+   LoadingTitle = "Optimización de Distancia...",
    LoadingSubtitle = "by RevSeba",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV55"
+      FileName = "ManagerV57"
    },
    Discord = {
       Enabled = false,
@@ -247,7 +247,7 @@ if NOTIFY_REMOTE then
 end
 
 -- =================================================================
--- LÓGICA DE REPARACIÓN (V5.5 OPTIMIZADA)
+-- LÓGICA DE REPARACIÓN (V5.7 SIMPLE)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -455,44 +455,35 @@ startAutoRepair = function()
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel.Misc:FindFirstChild("Hood", true) and carModel.Misc.Hood:FindFirstChild("Detector", true) and carModel.Misc.Hood.Detector:FindFirstChild("ClickDetector")
     if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
     
-    -- >>> SECCIÓN DE PINTURA OPTIMIZADA (V5.5) <<<
+    -- >>> SECCIÓN DE PINTURA (V5.7: SIN VIAJES, SOLO PROXIMIDAD) <<<
     
     local paintArea = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint")
     local paintPrompt = paintArea:FindFirstChild("Prompt", true) and paintArea:FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
     
     if paintPrompt and setPaintEvent then
-        updateStatus("Pintando... (Remoto)")
+        updateStatus("Finalizando (Pintura)...")
         
-        -- 1. Activamos Prompt a distancia (Sin teleport)
+        -- 1. Nos movemos AL LADO del auto que acabamos de reparar (de pie, sin sentarse)
+        -- Usamos GetPivot() + 5 studs a la derecha para estar "cerca" pero no encima.
+        if carModel and carModel.PrimaryPart then
+            rootPart.CFrame = carModel:GetPivot() * CFrame.new(5, 0, 0)
+        elseif carModel and carModel:FindFirstChild("DriveSeat") then
+             rootPart.CFrame = carModel.DriveSeat.CFrame * CFrame.new(5, 0, 0)
+        end
+        
+        task.wait(0.5) -- Esperar que cargue
+        
+        -- 2. Activamos el botón de pintura REMOTAMENTE (sin ir allá)
         fireproximityprompt(paintPrompt)
-        task.wait(0.5) -- Espera técnica para que el servidor abra sesión
+        task.wait(0.5) 
         
-        -- 2. Buscamos el auto que está AL LADO NUESTRO (porque no nos movimos)
-        local foundCar = nil
-        local minPaintDist = 50 
+        -- 3. Enviamos la señal de pintura con el FIX ("Car")
+        pcall(function() 
+            setPaintEvent:FireServer("Car", carModel, Color3.fromHSV(math.random(), 1, 1)) 
+            print("🖌️ PINTURA ÉXITO: Método 'Car' enviado.")
+        end)
         
-        for _, c in pairs(VEHICLES_FOLDER:GetChildren()) do
-            if c:IsA("Model") and (c:GetAttribute("Owner") == player.Name or c.Name == player.Name.."'s Car") then
-                local refPart = c:FindFirstChild("DriveSeat") or c:FindFirstChildOfClass("BasePart", true)
-                if refPart then
-                     local dist = (rootPart.Position - refPart.Position).Magnitude
-                     if dist < minPaintDist then
-                         minPaintDist = dist
-                         foundCar = c
-                     end
-                end
-            end
-        end
-        
-        if foundCar then
-            pcall(function() 
-                setPaintEvent:FireServer("Car", foundCar, Color3.fromHSV(math.random(), 1, 1)) 
-                print("🖌️ PINTURA ÉXITO: Método 'Car' enviado.")
-            end)
-            Rayfield:Notify({Title = "Pintura", Content = "Auto pintado correctamente.", Duration = 3})
-        else
-            warn("No se encontró tu auto cerca para pintar.")
-        end
+        Rayfield:Notify({Title = "Pintura", Content = "Auto pintado (Proximity Fix).", Duration = 3})
         task.wait(2)
     end
      
@@ -596,29 +587,4 @@ spawn(function()
     end
 end)
 
-if displayMessageEvent then
-    displayMessageEvent.OnClientEvent:Connect(function(...)
-        if currentMode ~= "BUY" then return end 
-        local args = {...}; local text = args[2]
-        if not text or type(text) ~= "string" then return end
-         
-        local percentStr = text:match("(%d+)%%")
-        local model = text:match("([%w%s]+) has appeared") or text:match("([%w%s]+)%s*%d+%%")
-
-        if percentStr and model then
-            local percent = tonumber(percentStr)
-            if percent <= VIP_THRESHOLD then
-                task.wait(0.5)
-                local children = VEHICLES_FOLDER:GetChildren()
-                local lastCar = children[#children]
-                if lastCar and lastCar:IsA("Model") and not isCarInQueue(lastCar) then
-                    Rayfield:Notify({Title = "Evento VIP", Content = "Nuevo auto: " .. percent .. "%", Duration = 4})
-                    table.insert(autoBuyCarQueue, {car = lastCar, percent = percent})  
-                    updateStatus("Cola VIP: " .. #autoBuyCarQueue)
-                end
-            end
-        end
-    end)
-end
-
-Rayfield:Notify({Title = "V5.5 Cargada", Content = "Pintura remota lista.", Duration = 5})
+Rayfield:Notify({Title = "V5.7 Lista", Content = "Distancia segura aplicada.", Duration = 5})
