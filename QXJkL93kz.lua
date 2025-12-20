@@ -1,19 +1,19 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V5.3): "FINAL PAINT FIX" ---
--- --- FIX: Integración del método correcto ("Car", Modelo, Color) ---
+-- --- SCRIPT MAESTRO (V5.5): "REMOTE PAINT" ---
+-- --- FIX: Pinta a distancia sin mover al personaje ("Car", Model, Color) ---
 -- =================================================================
 
 -- Cargar Rayfield Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "FIX IT UP! | Auto-Farm V5.3",
-   LoadingTitle = "Cargando Fix Final...",
+   Name = "FIX IT UP! | Auto-Farm V5.5",
+   LoadingTitle = "Optimización de Pintura...",
    LoadingSubtitle = "by RevSeba",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV53"
+      FileName = "ManagerV55"
    },
    Discord = {
       Enabled = false,
@@ -219,7 +219,6 @@ startAutoSellLoop = function()
              
             if carInWorld then
                 carInWorld:PivotTo(targetCFrame)
-                -- Intento de pintura al vender usando el nuevo método
                 if setPaintEvent then
                    pcall(function() setPaintEvent:FireServer("Car", carInWorld, Color3.fromHSV(math.random(), 1, 1)) end)
                 end
@@ -248,7 +247,7 @@ if NOTIFY_REMOTE then
 end
 
 -- =================================================================
--- LÓGICA DE REPARACIÓN (INTEGRADA)
+-- LÓGICA DE REPARACIÓN (V5.5 OPTIMIZADA)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -456,27 +455,23 @@ startAutoRepair = function()
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel.Misc:FindFirstChild("Hood", true) and carModel.Misc.Hood:FindFirstChild("Detector", true) and carModel.Misc.Hood.Detector:FindFirstChild("ClickDetector")
     if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
     
-    -- >>> SECCIÓN DE PINTURA (V5.3 - TU FIX) <<<
-    -- Utilizamos el método descubierto: Prompt + Re-escaneo + "Car" Argumento
+    -- >>> SECCIÓN DE PINTURA OPTIMIZADA (V5.5) <<<
     
     local paintArea = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint")
     local paintPrompt = paintArea:FindFirstChild("Prompt", true) and paintArea:FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
     
     if paintPrompt and setPaintEvent then
-        updateStatus("Pintando... (V5.3 Final)")
+        updateStatus("Pintando... (Remoto)")
         
-        -- Teletransportamos al prompt para activarlo
-        rootPart.CFrame = paintPrompt.Parent.CFrame * CFrame.new(0, 0, 4)
-        task.wait(0.5)
+        -- 1. Activamos Prompt a distancia (Sin teleport)
         fireproximityprompt(paintPrompt)
-        task.wait(0.5) -- Esperar a que el servidor registre la activación
+        task.wait(0.5) -- Espera técnica para que el servidor abra sesión
         
-        -- Re-escaneamos para encontrar TU auto actual (Lógica de tu script)
+        -- 2. Buscamos el auto que está AL LADO NUESTRO (porque no nos movimos)
         local foundCar = nil
         local minPaintDist = 50 
         
         for _, c in pairs(VEHICLES_FOLDER:GetChildren()) do
-            -- Chequeamos Owner (tu lógica)
             if c:IsA("Model") and (c:GetAttribute("Owner") == player.Name or c.Name == player.Name.."'s Car") then
                 local refPart = c:FindFirstChild("DriveSeat") or c:FindFirstChildOfClass("BasePart", true)
                 if refPart then
@@ -490,7 +485,6 @@ startAutoRepair = function()
         end
         
         if foundCar then
-            -- EL FIX DEFINITIVO: Primer argumento "Car"
             pcall(function() 
                 setPaintEvent:FireServer("Car", foundCar, Color3.fromHSV(math.random(), 1, 1)) 
                 print("🖌️ PINTURA ÉXITO: Método 'Car' enviado.")
@@ -627,4 +621,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "V5.3 Cargada", Content = "Fix de pintura aplicado.", Duration = 5})
+Rayfield:Notify({Title = "V5.5 Cargada", Content = "Pintura remota lista.", Duration = 5})
