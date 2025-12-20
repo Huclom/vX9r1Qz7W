@@ -1,19 +1,19 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V5.2): "LIVE REF FIX" ---
--- --- FIX: Obtiene una referencia fresca del auto al pintar para evitar error NIL ---
+-- --- SCRIPT MAESTRO (V5.3): "FINAL PAINT FIX" ---
+-- --- FIX: Integración del método correcto ("Car", Modelo, Color) ---
 -- =================================================================
 
 -- Cargar Rayfield Library
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mechanic Tycoon | Auto-Farm V5.2",
-   LoadingTitle = "Cargando Fix de Referencia...",
-   LoadingSubtitle = "by Gemini & Sebastian",
+   Name = "FIX IT UP! | Auto-Farm V5.3",
+   LoadingTitle = "Cargando Fix Final...",
+   LoadingSubtitle = "by RevSeba",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV52"
+      FileName = "ManagerV53"
    },
    Discord = {
       Enabled = false,
@@ -68,8 +68,6 @@ end
 local remoteLoad = getRemote(RS_Events:WaitForChild("Vehicles", 10), "RemoteLoad")
 local displayMessageEvent = getRemote(RS_Events, "DisplayMessage")
 local NOTIFY_REMOTE = RS_Events:FindFirstChild("HUD") and RS_Events.HUD:FindFirstChild("Notifiy")
-
--- Confirmado por RemoteSpy: La ruta es correcta
 local setPaintEvent = RS_Events:FindFirstChild("Vehicles") and RS_Events.Vehicles:FindFirstChild("SetPaint")
 
 local CONFIRM_REMOTE = RS_Events:FindFirstChild("HUD") and RS_Events.HUD:FindFirstChild("Confirmation")
@@ -176,7 +174,7 @@ local function tryClickButtonByName(text)
 end
 
 TabManual:CreateButton({
-   Name = "Limpiar Drop (Manual)",
+   Name = "Limpiar Suelo",
    Callback = function()
         tryClickButtonByName("delete dropped parts")
    end,
@@ -221,8 +219,9 @@ startAutoSellLoop = function()
              
             if carInWorld then
                 carInWorld:PivotTo(targetCFrame)
+                -- Intento de pintura al vender usando el nuevo método
                 if setPaintEvent then
-                   pcall(function() setPaintEvent:FireServer(carInWorld, Color3.fromHSV(math.random(), 1, 1)) end)
+                   pcall(function() setPaintEvent:FireServer("Car", carInWorld, Color3.fromHSV(math.random(), 1, 1)) end)
                 end
                 task.wait(0.5)
                 if promptVenta then pcall(fireproximityprompt, promptVenta, 0) end
@@ -249,7 +248,7 @@ if NOTIFY_REMOTE then
 end
 
 -- =================================================================
--- LÓGICA DE REPARACIÓN (V5.2 - Live Reference)
+-- LÓGICA DE REPARACIÓN (INTEGRADA)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -273,7 +272,6 @@ startAutoRepair = function()
     isRepairRunning = true
     updateStatus("REPARANDO: Iniciando proceso...")
 
-    -- Guardamos la referencia inicial SOLO para reparaciones, no para pintura final
     local carModel = targetCar 
     local machineMap = { ["Battery"]="BatteryCharger", ["AirIntake"]="PartsWasher", ["Radiator"]="PartsWasher", ["CylinderHead"]="GrindingMachine", ["EngineBlock"]="GrindingMachine", ["ExhaustManifold"] = "GrindingMachine", ["Suspension"]="GrindingMachine", ["Alternator"]="GrindingMachine", ["Transmission"]="GrindingMachine" }
 
@@ -295,7 +293,6 @@ startAutoRepair = function()
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(2) 
 
-    -- LIMPIEZA
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     if #moveablePartsFolder:GetChildren() > 0 then
         updateStatus("REPARANDO: Limpiando zona...")
@@ -309,7 +306,6 @@ startAutoRepair = function()
         end
     end
      
-    -- ANÁLISIS
     updateStatus("REPARANDO: Analizando motor...")
     local carPartsEvent = carModel:WaitForChild("PartsEvent", 10)
     local engineBay = carModel:FindFirstChild("Body", true) 
@@ -345,7 +341,6 @@ startAutoRepair = function()
         end
     end
      
-    -- DESMONTAJE
     for _, partName in ipairs(allPartNames) do 
         if not isRepairRunning then break end
         pcall(function() carPartsEvent:FireServer("RemovePart", partName) end)
@@ -355,7 +350,6 @@ startAutoRepair = function()
     tryClickButtonByName("bring dropped parts")
     task.wait(2)
      
-    -- PARALELO (COMPRA/REPARACIÓN)
     local shopFolder = Workspace:WaitForChild("PartsStore"):WaitForChild("SpareParts"):WaitForChild("Parts")
     local function do_parallel_buy()
         for _, partString in ipairs(partsToBuy_Data) do
@@ -442,7 +436,6 @@ startAutoRepair = function()
     while not (buy_done and repair_done) and isRepairRunning do task.wait(0.5) end
     if not isRepairRunning then return end
 
-    -- ENSAMBLAJE
     updateStatus("REPARANDO: Ensamblando...")
     for _, partSlotName in ipairs(allPartNames) do
         if not isRepairRunning then break end 
@@ -463,55 +456,55 @@ startAutoRepair = function()
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel.Misc:FindFirstChild("Hood", true) and carModel.Misc.Hood:FindFirstChild("Detector", true) and carModel.Misc.Hood.Detector:FindFirstChild("ClickDetector")
     if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
     
-    -- >>> SECCIÓN DE PINTURA (V5.2) <<<
-    -- FIX: Escaneamos de nuevo el auto para obtener una referencia fresca y no NIL
-    local paintPrompt = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint"):FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
+    -- >>> SECCIÓN DE PINTURA (V5.3 - TU FIX) <<<
+    -- Utilizamos el método descubierto: Prompt + Re-escaneo + "Car" Argumento
     
-    if paintPrompt then
-        updateStatus("Pintando... (V5.2 Fix)")
+    local paintArea = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint")
+    local paintPrompt = paintArea:FindFirstChild("Prompt", true) and paintArea:FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
+    
+    if paintPrompt and setPaintEvent then
+        updateStatus("Pintando... (V5.3 Final)")
         
-        -- Nos sentamos primero para asegurar posición
-        local carSeat = carModel:FindFirstChild("DriveSeat") or carModel:FindFirstChildOfClass("BasePart", true)
-        if carSeat then rootPart.CFrame = carSeat.CFrame * CFrame.new(0, 3, 15); task.wait(1) end
+        -- Teletransportamos al prompt para activarlo
+        rootPart.CFrame = paintPrompt.Parent.CFrame * CFrame.new(0, 0, 4)
+        task.wait(0.5)
+        fireproximityprompt(paintPrompt)
+        task.wait(0.5) -- Esperar a que el servidor registre la activación
         
-        pcall(fireproximityprompt, paintPrompt, 0)
-        task.wait(1)
+        -- Re-escaneamos para encontrar TU auto actual (Lógica de tu script)
+        local foundCar = nil
+        local minPaintDist = 50 
         
-        local clickedUI = tryClickButtonByName("Confirm") or tryClickButtonByName("Yes") or tryClickButtonByName("Paint")
-        
-        if setPaintEvent then
-            -- >>> AQUÍ ESTÁ EL CAMBIO IMPORTANTE <<<
-            -- Buscamos el auto que esté más cerca del área de pintura AHORA MISMO
-            local freshCarModel = nil
-            local minPaintDist = 20
-            local paintAreaPos = paintPrompt.Parent.Position -- Asumimos que el prompt está cerca del auto
-            
-            for _, c in pairs(VEHICLES_FOLDER:GetChildren()) do
-                if c:IsA("Model") and c:GetPivot() then
-                    local d = (c:GetPivot().Position - rootPart.Position).Magnitude
-                    if d < minPaintDist then
-                        minPaintDist = d
-                        freshCarModel = c
-                    end
+        for _, c in pairs(VEHICLES_FOLDER:GetChildren()) do
+            -- Chequeamos Owner (tu lógica)
+            if c:IsA("Model") and (c:GetAttribute("Owner") == player.Name or c.Name == player.Name.."'s Car") then
+                local refPart = c:FindFirstChild("DriveSeat") or c:FindFirstChildOfClass("BasePart", true)
+                if refPart then
+                     local dist = (rootPart.Position - refPart.Position).Magnitude
+                     if dist < minPaintDist then
+                         minPaintDist = dist
+                         foundCar = c
+                     end
                 end
             end
-            
-            if freshCarModel then
-                -- Enviamos el evento con el auto FRESCO
-                pcall(function() 
-                    setPaintEvent:FireServer(freshCarModel, Color3.fromHSV(math.random(), 1, 1)) 
-                    print("🖌️ V5.2: Pintura enviada a " .. freshCarModel.Name)
-                end)
-            else
-                warn("No se encontró auto cercano para pintar (Live Ref Failed)")
-            end
+        end
+        
+        if foundCar then
+            -- EL FIX DEFINITIVO: Primer argumento "Car"
+            pcall(function() 
+                setPaintEvent:FireServer("Car", foundCar, Color3.fromHSV(math.random(), 1, 1)) 
+                print("🖌️ PINTURA ÉXITO: Método 'Car' enviado.")
+            end)
+            Rayfield:Notify({Title = "Pintura", Content = "Auto pintado correctamente.", Duration = 3})
+        else
+            warn("No se encontró tu auto cerca para pintar.")
         end
         task.wait(2)
     end
      
     isRepairRunning = false
     updateStatus("REPARACIÓN COMPLETADA")
-    Rayfield:Notify({Title = "Trabajo Terminado", Content = "Auto reparado y pintado.", Duration = 3})
+    Rayfield:Notify({Title = "Trabajo Terminado", Content = "Ciclo finalizado.", Duration = 3})
 end
 
 -- =================================================================
@@ -634,4 +627,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "V5.2 Fix", Content = "Fix de referencia fantasma aplicado.", Duration = 5})
+Rayfield:Notify({Title = "V5.3 Cargada", Content = "Fix de pintura aplicado.", Duration = 5})
