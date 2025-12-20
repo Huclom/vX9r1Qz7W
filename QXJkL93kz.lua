@@ -1,6 +1,6 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V6.4): "TIME ENFORCEMENT" ---
--- --- FIX: Obliga a esperar el tiempo completo de limpieza (10s) ---
+-- --- SCRIPT MAESTRO (V6.5): "ONE-CLICK WAIT" ---
+-- --- FIX: Presiona borrar 1 vez y espera pasivamente sin reiniciar el timer ---
 -- =================================================================
 
 -- >>> SISTEMA ANTI-OVERLAP <<<
@@ -13,13 +13,13 @@ getgenv().MechanicFarmRunning = true
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mechanic Tycoon | Auto-Farm V6.4",
-   LoadingTitle = "Modo Limpieza Cronometrada...",
+   Name = "Mechanic Tycoon | Auto-Farm V6.5",
+   LoadingTitle = "Modo Espera Pasiva...",
    LoadingSubtitle = "by Gemini & Sebastian",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV64"
+      FileName = "ManagerV65"
    },
    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
    KeySystem = false,
@@ -45,7 +45,7 @@ local isAutoBuyCarBuying = false
 local autoBuyCarQueue = {} 
 local isRepairRunning = false 
 local FAIL_DELAY = 5 
-local CLEAN_DELAY = 10 -- TIEMPO POR DEFECTO
+local CLEAN_DELAY = 10 
 local VIP_THRESHOLD = 10 
 
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
@@ -118,14 +118,11 @@ local VIPSlider = TabSettings:CreateSlider({
 
 local CleanDelaySlider = TabSettings:CreateSlider({
    Name = "Tiempo de Limpieza (Segundos)",
-   Range = {0, 30},
+   Range = {0, 20},
    Increment = 1,
    Suffix = "s",
-   CurrentValue = 10, -- Valor por defecto
-   Callback = function(Value) 
-       CLEAN_DELAY = Value 
-       print("Tiempo limpieza ajustado a: " .. Value)
-   end,
+   CurrentValue = 10,
+   Callback = function(Value) CLEAN_DELAY = Value end,
 })
 
 -- =================================================================
@@ -160,21 +157,22 @@ local function tryClickButtonByName(text)
     return false
 end
 
-local function forceCleanup()
-    for i = 1, 3 do
-        if tryClickButtonByName("delete dropped parts") then return true end
-        task.wait(0.1)
+local function forceCleanupOnce()
+    -- Solo hace click si el botón está visible
+    if tryClickButtonByName("delete dropped parts") then
+        print("🗑️ Botón de borrar presionado (1 vez).")
+        return true
     end
     return false
 end
 
 TabManual:CreateButton({
-   Name = "Limpiar Suelo",
-   Callback = function() forceCleanup() end,
+   Name = "Limpiar Suelo (1 Click)",
+   Callback = function() forceCleanupOnce() end,
 })
 
 -- =================================================================
--- REPARACIÓN V6.4 (CLEAN DELAY FIXED)
+-- REPARACIÓN V6.5 (ONE-CLICK WAIT)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -219,10 +217,12 @@ startAutoRepair = function()
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1) 
 
+    -- LIMPIEZA INICIAL (Solo si es necesario)
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     if #moveablePartsFolder:GetChildren() > 0 then
-        forceCleanup()
-        task.wait(1)
+        updateStatus("REPARANDO: Limpieza inicial...")
+        forceCleanupOnce()
+        task.wait(1) -- Pequeña espera
     end
      
     -- Analizar Piezas
@@ -385,16 +385,16 @@ startAutoRepair = function()
         task.wait(2)
     end
      
-    -- >>> FASE DE LIMPIEZA FINAL V6.4 (OBLIGATORIA CON TEMPORIZADOR) <<<
+    -- >>> FASE DE LIMPIEZA V6.5 (CLICK 1 VEZ + ESPERA PASIVA) <<<
+    updateStatus("LIMPIEZA FINAL: Activando botón...")
+    forceCleanupOnce() -- CLICK UNA VEZ
+    
     local startTime = os.clock()
     local elapsed = 0
-    
-    -- Usamos el CLEAN_DELAY configurado en el slider
     while elapsed < CLEAN_DELAY do
         local remaining = math.ceil(CLEAN_DELAY - elapsed)
-        updateStatus("LIMPIEZA FINAL: " .. remaining .. "s restantes...")
-        forceCleanup() -- Spamea el botón de borrar
-        task.wait(1)
+        updateStatus("LIMPIEZA FINAL: Esperando " .. remaining .. "s (Sin tocar)...")
+        task.wait(1) -- Solo esperamos, no tocamos nada
         elapsed = os.clock() - startTime
     end
     
@@ -438,6 +438,13 @@ spawn(function()
         if currentMode ~= "BUY" or #autoBuyCarQueue == 0 or isAutoBuyCarBuying then continue end
 
         isAutoBuyCarBuying = true
+        
+        -- Limpieza PRE-Compra (Si detecta algo)
+        if tryClickButtonByName("delete dropped parts") then
+             updateStatus("Limpieza Pre-Compra (3s)...")
+             forceCleanupOnce()
+             task.wait(3)
+        end
         
         table.sort(autoBuyCarQueue, function(a, b) return a.percent < b.percent end)
         local item = table.remove(autoBuyCarQueue, 1)
@@ -492,4 +499,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "V6.4 Final", Content = "Limpieza forzada aplicada.", Duration = 5})
+Rayfield:Notify({Title = "V6.5 Final", Content = "Fix Limpieza (Click Único)", Duration = 5})
