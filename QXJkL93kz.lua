@@ -1,6 +1,6 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V6.2): "PARALLEL REPAIR FIX" ---
--- --- FIX: Restaura la reparación simultánea de múltiples piezas ---
+-- --- SCRIPT MAESTRO (V6.3): "CLEAN FREAK" ---
+-- --- FIX: Fase de limpieza obligatoria entre ciclos ---
 -- =================================================================
 
 -- >>> SISTEMA ANTI-OVERLAP <<<
@@ -13,13 +13,13 @@ getgenv().MechanicFarmRunning = true
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "FIX IT UP | Auto-Farm V6.2",
-   LoadingTitle = "Modo Paralelo Activado...",
-   LoadingSubtitle = "Rev Seba",
+   Name = "Mechanic Tycoon | Auto-Farm V6.3",
+   LoadingTitle = "Modo Limpieza Extrema...",
+   LoadingSubtitle = "by Gemini & Sebastian",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV62"
+      FileName = "ManagerV63"
    },
    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
    KeySystem = false,
@@ -157,13 +157,25 @@ local function tryClickButtonByName(text)
     return false
 end
 
+-- >>> NUEVA FUNCIÓN DE LIMPIEZA FORZADA <<<
+local function forceCleanup()
+    -- Intenta presionar el botón 3 veces
+    for i = 1, 3 do
+        if tryClickButtonByName("delete dropped parts") then
+            return true
+        end
+        task.wait(0.2)
+    end
+    return false
+end
+
 TabManual:CreateButton({
    Name = "Limpiar Suelo",
-   Callback = function() tryClickButtonByName("delete dropped parts") end,
+   Callback = function() forceCleanup() end,
 })
 
 -- =================================================================
--- REPARACIÓN V6.2 (PARALLEL RESTORED)
+-- REPARACIÓN V6.3 (CLEAN FREAK)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -190,7 +202,6 @@ startAutoRepair = function()
     local carModel = targetCar 
     local machineMap = { ["Battery"]="BatteryCharger", ["AirIntake"]="PartsWasher", ["Radiator"]="PartsWasher", ["CylinderHead"]="GrindingMachine", ["EngineBlock"]="GrindingMachine", ["ExhaustManifold"] = "GrindingMachine", ["Suspension"]="GrindingMachine", ["Alternator"]="GrindingMachine", ["Transmission"]="GrindingMachine" }
 
-    -- Ir al Pit
     local function getPitStop()
         local map = Workspace:WaitForChild("Map")
         local pitStopPosition = Vector3.new(-981.30127, 18.0568581, -129.036621)
@@ -211,8 +222,8 @@ startAutoRepair = function()
 
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     if #moveablePartsFolder:GetChildren() > 0 then
-        for i=1,3 do if tryClickButtonByName("bring dropped parts") then task.wait(1); break end; task.wait(0.5) end
-        for i=1,5 do if tryClickButtonByName("delete dropped parts") then task.wait(2); break end; task.wait(0.5) end
+        forceCleanup() -- Limpieza inicial
+        task.wait(1)
     end
      
     -- Analizar Piezas
@@ -248,7 +259,6 @@ startAutoRepair = function()
         end
     end
      
-    -- Desmontar
     for _, partName in ipairs(allPartNames) do 
         pcall(function() carPartsEvent:FireServer("RemovePart", partName) end)
         task.wait(0.1) 
@@ -261,7 +271,7 @@ startAutoRepair = function()
         for _, partString in ipairs(partsToBuy_Data) do
             local split = string.split(partString, "|")
             local itemCD = shopFolder:FindFirstChild(split[2], true) and shopFolder:FindFirstChild(split[2], true):FindFirstChild(split[3], true) and shopFolder:FindFirstChild(split[2], true):FindFirstChild(split[3], true):FindFirstChild("ClickDetector", true)
-            if itemCD then fireclickdetector(itemCD); task.wait(0.1) end -- Click rápido
+            if itemCD then fireclickdetector(itemCD); task.wait(0.1) end 
         end
     end)
 
@@ -282,16 +292,12 @@ startAutoRepair = function()
     end
     local machineIndexes = { BatteryCharger = 1, GrindingMachine = 1, PartsWasher = 1 }
 
-    -- >>> REPARACIÓN PARALELA V6.2 (FIXED) <<<
-    updateStatus("REPARANDO: Distribuyendo piezas a máquinas...")
-    
+    -- Reparación Paralela
+    updateStatus("REPARANDO: Distribuyendo piezas...")
     local partsBeingRepaired = {} 
-    
-    -- Fase 1: Distribuir todas las piezas simultáneamente
     for _, partSlotName in ipairs(partsToRepair_Names) do
         local targetDroppedName = droppedPartNameMap[partSlotName] or partSlotName
         local partObject = moveablePartsFolder:FindFirstChild(targetDroppedName)
-        
         if partObject then
             local wear = partObject:GetAttribute("Wear") or 0
             if wear > 0 then
@@ -299,53 +305,33 @@ startAutoRepair = function()
                 if basePartName:find("Transmission") then basePartName = "Transmission" end
                 local machineName = machineMap[basePartName]
                 local pool = machinePools[machineName]
-                
                 if pool and #pool > 0 then
-                    -- Rotación de máquinas para no saturar
                     local idx = machineIndexes[machineName]
                     local machine = pool[idx]
-                    machineIndexes[machineName] = (idx % #pool) + 1 -- Siguiente máquina
-                    
+                    machineIndexes[machineName] = (idx % #pool) + 1
                     local detectorPad = machine:FindFirstChild("Detector", true)
-                    
                     if detectorPad then
-                        -- Enviar pieza a la máquina
                         partObject:PivotTo(detectorPad.CFrame * CFrame.new(0, 0.5, 0))
-                        
-                        -- Guardar en cola para monitorear
-                        table.insert(partsBeingRepaired, { 
-                            Part = partObject, 
-                            Machine = machine, 
-                            CD = machineClickDetectors[machine],
-                            StartTime = os.clock()
-                        })
+                        table.insert(partsBeingRepaired, { Part = partObject, Machine = machine, CD = machineClickDetectors[machine], StartTime = os.clock() })
                     end
                 end
             end
         end
     end 
     
-    -- Fase 2: Activar máquinas y esperar
-    task.wait(0.5) -- Esperar que caigan las piezas
-    for _, job in ipairs(partsBeingRepaired) do
-        if job.CD then fireclickdetector(job.CD) end
-    end
+    task.wait(0.5) 
+    for _, job in ipairs(partsBeingRepaired) do if job.CD then fireclickdetector(job.CD) end end
     
-    -- Fase 3: Esperar a que terminen
     local repairTimeout = 0
     while #partsBeingRepaired > 0 and repairTimeout < 20 do
         task.wait(0.5)
         repairTimeout = repairTimeout + 0.5
-        
         for i = #partsBeingRepaired, 1, -1 do
             local job = partsBeingRepaired[i]
             local wear = job.Part:GetAttribute("Wear") or 0
-            
             if wear == 0 then
-                -- Reparado
                 table.remove(partsBeingRepaired, i)
             elseif (os.clock() - job.StartTime) > 8 then
-                -- Se atascó, intentar clickear de nuevo
                 job.StartTime = os.clock()
                 if job.CD then fireclickdetector(job.CD) end
             end
@@ -372,9 +358,8 @@ startAutoRepair = function()
     local hoodCD = carModel:FindFirstChild("Misc", true) and carModel.Misc:FindFirstChild("Hood", true) and carModel.Misc.Hood:FindFirstChild("Detector", true) and carModel.Misc.Hood.Detector:FindFirstChild("ClickDetector")
     if hoodCD then fireclickdetector(hoodCD); task.wait(1) end
     
-    -- >>> V6.1: TELETRANSFORTE DE PIE (SIN SENTARSE) <<<
+    -- Pintura
     updateStatus("REPARANDO: Regresando al auto (DE PIE)...")
-    
     local safePos = carModel:GetPivot() * CFrame.new(-6, 2, 0)
     rootPart.CFrame = safePos
     
@@ -388,7 +373,6 @@ startAutoRepair = function()
         if attempts % 5 == 0 then rootPart.CFrame = safePos end
     until arrived or attempts > 20
     
-    -- >>> SECCIÓN PINTURA <<<
     local paintArea = Workspace:WaitForChild("Map"):WaitForChild("pintamento"):WaitForChild("CarPaint")
     local paintPrompt = paintArea:FindFirstChild("Prompt", true) and paintArea:FindFirstChild("Prompt", true):FindFirstChild("ProximityPrompt")
     
@@ -396,14 +380,18 @@ startAutoRepair = function()
         updateStatus("Finalizando (Pintura)...")
         fireproximityprompt(paintPrompt)
         task.wait(0.5) 
-        
         pcall(function() 
             setPaintEvent:FireServer("Car", carModel, Color3.fromHSV(math.random(), 1, 1)) 
-            print("🖌️ PINTADO. LIBERANDO CANDADO.")
         end)
         task.wait(2)
     end
      
+    -- >>> FASE DE LIMPIEZA FINAL (OBLIGATORIA) <<<
+    updateStatus("LIMPIEZA FINAL: Borrando rastros...")
+    forceCleanup() -- Presiona Trash 3 veces
+    task.wait(1)   -- Espera a que se borren
+    forceCleanup() -- Asegura
+    
     isRepairRunning = false 
     updateStatus("LIBRE: Buscando nuevos VIPs...")
 end
@@ -445,6 +433,10 @@ spawn(function()
 
         isAutoBuyCarBuying = true
         
+        -- Limpieza PRE-Compra (Para evitar encontrar basura del ciclo anterior)
+        updateStatus("Limpieza Pre-Compra...")
+        forceCleanup()
+        
         table.sort(autoBuyCarQueue, function(a, b) return a.percent < b.percent end)
         local item = table.remove(autoBuyCarQueue, 1)
         local carToBuy = item.car
@@ -454,10 +446,6 @@ spawn(function()
         end
 
         updateStatus("Comprando VIP ("..item.percent.."%)...")
-        
-        if not isRepairRunning and tryClickButtonByName("delete dropped parts") then
-            for k=1, 3 do task.wait(1) end 
-        end
          
         if currentMode ~= "BUY" then isAutoBuyCarBuying = false; continue end
 
@@ -502,4 +490,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "V6.2 Final", Content = "Paralelo + No-Sit Activado.", Duration = 5})
+Rayfield:Notify({Title = "V6.3 Final", Content = "Limpieza extrema activada.", Duration = 5})
