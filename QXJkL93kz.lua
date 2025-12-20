@@ -1,6 +1,6 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V6.5): "ONE-CLICK WAIT" ---
--- --- FIX: Presiona borrar 1 vez y espera pasivamente sin reiniciar el timer ---
+-- --- SCRIPT MAESTRO (V6.7): "CLASSIC SELL RESTORE" ---
+-- --- FIX: Regreso a la lógica de venta V4.61 + Reparación V6.5 ---
 -- =================================================================
 
 -- >>> SISTEMA ANTI-OVERLAP <<<
@@ -13,13 +13,13 @@ getgenv().MechanicFarmRunning = true
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mechanic Tycoon | Auto-Farm V6.5",
-   LoadingTitle = "Modo Espera Pasiva...",
+   Name = "Mechanic Tycoon | Auto-Farm V6.7",
+   LoadingTitle = "Restaurando Venta Clásica...",
    LoadingSubtitle = "by Gemini & Sebastian",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV65"
+      FileName = "ManagerV67"
    },
    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
    KeySystem = false,
@@ -49,6 +49,8 @@ local CLEAN_DELAY = 10
 local VIP_THRESHOLD = 10 
 
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
+
+-- TU LISTA ORIGINAL (No la toco)
 local AUTOS_PARA_VENDER = {
     "Merquis C203", "Missah 750x", "Matsu Lanca", "Lokswag Golo GT", "BNV K5 e39",
     "Four Traffic", "Lokswag Golo MK5", "Toyoda Hellox", "Holde Inteiro",
@@ -66,7 +68,10 @@ local function getRemote(folder, name) if not folder then return nil end return 
 
 local remoteLoad = getRemote(RS_Events:WaitForChild("Vehicles", 10), "RemoteLoad")
 local displayMessageEvent = getRemote(RS_Events, "DisplayMessage")
-local NOTIFY_REMOTE = RS_Events:FindFirstChild("HUD") and RS_Events.HUD:FindFirstChild("Notifiy")
+
+-- Fix de ortografía del juego (Notifiy vs Notify)
+local NOTIFY_REMOTE = RS_Events:FindFirstChild("HUD") and (RS_Events.HUD:FindFirstChild("Notifiy") or RS_Events.HUD:FindFirstChild("Notify"))
+
 local setPaintEvent = RS_Events:FindFirstChild("Vehicles") and RS_Events.Vehicles:FindFirstChild("SetPaint")
 local CONFIRM_REMOTE = RS_Events:FindFirstChild("HUD") and RS_Events.HUD:FindFirstChild("Confirmation")
 local VEHICLES_FOLDER = Workspace:WaitForChild("Vehicles", 10)
@@ -158,21 +163,107 @@ local function tryClickButtonByName(text)
 end
 
 local function forceCleanupOnce()
-    -- Solo hace click si el botón está visible
-    if tryClickButtonByName("delete dropped parts") then
-        print("🗑️ Botón de borrar presionado (1 vez).")
-        return true
-    end
+    if tryClickButtonByName("delete dropped parts") then return true end
     return false
 end
 
 TabManual:CreateButton({
-   Name = "Limpiar Suelo (1 Click)",
-   Callback = function() forceCleanupOnce() end,
+   Name = "FORZAR MODO VENTA (Manual)",
+   Callback = function() 
+       currentMode = "SELL"
+       isRepairRunning = false
+       isAutoBuyCarBuying = false
+       task.spawn(startAutoSellLoop)
+   end,
 })
 
 -- =================================================================
--- REPARACIÓN V6.5 (ONE-CLICK WAIT)
+-- LÓGICA DE VENTA (RESTAURADA V4.61)
+-- =================================================================
+local function getSellPrompt()
+    local map = Workspace:FindFirstChild("Map")
+    local sellCar = map and map:FindFirstChild("SellCar")
+    return sellCar and sellCar:FindFirstChildWhichIsA("ProximityPrompt", true)
+end
+
+startAutoSellLoop = function()
+    updateStatus("🚨 MODO VENTA ACTIVADO 🚨")
+    
+    local rootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    local garageFolder = playerData:WaitForChild("Garage")
+     
+    -- Ir al vendedor
+    rootPart.CFrame = VENDEDOR_CFRAME
+    task.wait(2) 
+     
+    local promptVenta = getSellPrompt()
+    
+    for _, carData in ipairs(garageFolder:GetChildren()) do
+        if currentMode ~= "SELL" then break end 
+        local modelName = carData:FindFirstChild("Model") and carData.Model.Value
+        if not modelName then continue end 
+
+        -- LÓGICA CLÁSICA Y SIMPLE: Si está en la lista, se vende.
+        if table.find(AUTOS_PARA_VENDER, modelName) then
+            updateStatus("Vendiendo: " .. modelName)
+            
+            local carIDToSell = carData.Name
+            local targetCFrame = rootPart.CFrame * CFrame.new(0, 3, 12)
+             
+            if (rootPart.Position - VENDEDOR_CFRAME.Position).Magnitude > 20 then
+                rootPart.CFrame = VENDEDOR_CFRAME; task.wait(0.5)
+            end
+             
+            pcall(function() remoteLoad:InvokeServer(carData, targetCFrame) end)
+            
+            local carInWorld = Workspace.Vehicles:WaitForChild(carIDToSell, 5)
+             
+            if carInWorld then
+                carInWorld:PivotTo(targetCFrame)
+                
+                -- Pintura antes de vender (Fix V5.3)
+                if setPaintEvent then
+                   pcall(function() setPaintEvent:FireServer("Car", carInWorld, Color3.fromHSV(math.random(), 1, 1)) end)
+                end
+                
+                task.wait(0.5)
+                
+                if promptVenta then 
+                    fireproximityprompt(promptVenta, 0) 
+                    print("💰 Vendido: " .. modelName)
+                end
+                
+                task.wait(2.5) -- Tiempo para que desaparezca
+            end
+        end
+    end
+    
+    currentMode = "BUY"
+    updateStatus("Venta finalizada. Volviendo a Farm...")
+    task.spawn(scanExistingCars)
+end
+
+-- DETECTOR DE EVENTO (RIGUROSO)
+if NOTIFY_REMOTE then
+    NOTIFY_REMOTE.OnClientEvent:Connect(function(text)
+        -- Detección exacta como pediste
+        if text == "Garage limit reached" then
+            print("🚨 ALERTA: GARAJE LLENO DETECTADO")
+            
+            -- Interrupción Inmediata
+            currentMode = "SELL"
+            isRepairRunning = false -- Rompe el bucle de reparación
+            isAutoBuyCarBuying = false -- Rompe el bucle de compra
+            
+            task.wait(0.1) -- Breve pausa para asegurar cambio de variables
+            task.spawn(startAutoSellLoop)
+        end
+    end)
+end
+
+-- =================================================================
+-- REPARACIÓN V6.5 (MANTENIDA)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -217,12 +308,12 @@ startAutoRepair = function()
     rootPart.CFrame = pitStop:GetPivot() * CFrame.new(0, 3, 5)
     task.wait(1) 
 
-    -- LIMPIEZA INICIAL (Solo si es necesario)
+    -- LIMPIEZA INICIAL
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     if #moveablePartsFolder:GetChildren() > 0 then
         updateStatus("REPARANDO: Limpieza inicial...")
         forceCleanupOnce()
-        task.wait(1) -- Pequeña espera
+        task.wait(1)
     end
      
     -- Analizar Piezas
@@ -385,16 +476,16 @@ startAutoRepair = function()
         task.wait(2)
     end
      
-    -- >>> FASE DE LIMPIEZA V6.5 (CLICK 1 VEZ + ESPERA PASIVA) <<<
+    -- LIMPIEZA FINAL V6.5
     updateStatus("LIMPIEZA FINAL: Activando botón...")
-    forceCleanupOnce() -- CLICK UNA VEZ
+    forceCleanupOnce() 
     
     local startTime = os.clock()
     local elapsed = 0
     while elapsed < CLEAN_DELAY do
         local remaining = math.ceil(CLEAN_DELAY - elapsed)
         updateStatus("LIMPIEZA FINAL: Esperando " .. remaining .. "s (Sin tocar)...")
-        task.wait(1) -- Solo esperamos, no tocamos nada
+        task.wait(1)
         elapsed = os.clock() - startTime
     end
     
@@ -439,10 +530,9 @@ spawn(function()
 
         isAutoBuyCarBuying = true
         
-        -- Limpieza PRE-Compra (Si detecta algo)
+        -- Limpieza PRE-Compra (1 Click + Espera Corta)
         if tryClickButtonByName("delete dropped parts") then
              updateStatus("Limpieza Pre-Compra (3s)...")
-             forceCleanupOnce()
              task.wait(3)
         end
         
@@ -477,7 +567,6 @@ spawn(function()
     end
 end)
 
--- Eventos
 if displayMessageEvent then
     displayMessageEvent.OnClientEvent:Connect(function(...)
         if currentMode ~= "BUY" then return end 
@@ -499,4 +588,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "V6.5 Final", Content = "Fix Limpieza (Click Único)", Duration = 5})
+Rayfield:Notify({Title = "V6.7 Final", Content = "Venta clásica + Reparación óptima.", Duration = 5})
