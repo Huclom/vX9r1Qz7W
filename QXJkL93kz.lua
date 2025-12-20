@@ -1,6 +1,6 @@
 -- =================================================================
--- --- SCRIPT MAESTRO (V6.3): "CLEAN FREAK" ---
--- --- FIX: Fase de limpieza obligatoria entre ciclos ---
+-- --- SCRIPT MAESTRO (V6.4): "TIME ENFORCEMENT" ---
+-- --- FIX: Obliga a esperar el tiempo completo de limpieza (10s) ---
 -- =================================================================
 
 -- >>> SISTEMA ANTI-OVERLAP <<<
@@ -13,13 +13,13 @@ getgenv().MechanicFarmRunning = true
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Mechanic Tycoon | Auto-Farm V6.3",
-   LoadingTitle = "Modo Limpieza Extrema...",
+   Name = "Mechanic Tycoon | Auto-Farm V6.4",
+   LoadingTitle = "Modo Limpieza Cronometrada...",
    LoadingSubtitle = "by Gemini & Sebastian",
    ConfigurationSaving = {
       Enabled = true,
       FolderName = "MechanicFarmConfig",
-      FileName = "ManagerV63"
+      FileName = "ManagerV64"
    },
    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
    KeySystem = false,
@@ -45,7 +45,7 @@ local isAutoBuyCarBuying = false
 local autoBuyCarQueue = {} 
 local isRepairRunning = false 
 local FAIL_DELAY = 5 
-local CLEAN_DELAY = 10 
+local CLEAN_DELAY = 10 -- TIEMPO POR DEFECTO
 local VIP_THRESHOLD = 10 
 
 local VENDEDOR_CFRAME = CFrame.new(-1903.80859, 4.57728004, -779.534912, 0.00912900362, -6.48468301e-08, 0.999958336, 1.85525124e-08, 1, 6.46801581e-08, -0.999958336, 1.79612734e-08, 0.00912900362)
@@ -118,11 +118,14 @@ local VIPSlider = TabSettings:CreateSlider({
 
 local CleanDelaySlider = TabSettings:CreateSlider({
    Name = "Tiempo de Limpieza (Segundos)",
-   Range = {0, 20},
+   Range = {0, 30},
    Increment = 1,
    Suffix = "s",
-   CurrentValue = 10,
-   Callback = function(Value) CLEAN_DELAY = Value end,
+   CurrentValue = 10, -- Valor por defecto
+   Callback = function(Value) 
+       CLEAN_DELAY = Value 
+       print("Tiempo limpieza ajustado a: " .. Value)
+   end,
 })
 
 -- =================================================================
@@ -157,14 +160,10 @@ local function tryClickButtonByName(text)
     return false
 end
 
--- >>> NUEVA FUNCIÓN DE LIMPIEZA FORZADA <<<
 local function forceCleanup()
-    -- Intenta presionar el botón 3 veces
     for i = 1, 3 do
-        if tryClickButtonByName("delete dropped parts") then
-            return true
-        end
-        task.wait(0.2)
+        if tryClickButtonByName("delete dropped parts") then return true end
+        task.wait(0.1)
     end
     return false
 end
@@ -175,7 +174,7 @@ TabManual:CreateButton({
 })
 
 -- =================================================================
--- REPARACIÓN V6.3 (CLEAN FREAK)
+-- REPARACIÓN V6.4 (CLEAN DELAY FIXED)
 -- =================================================================
 startAutoRepair = function() 
     if currentMode ~= "BUY" then return end
@@ -222,7 +221,7 @@ startAutoRepair = function()
 
     local moveablePartsFolder = Workspace:WaitForChild("MoveableParts")
     if #moveablePartsFolder:GetChildren() > 0 then
-        forceCleanup() -- Limpieza inicial
+        forceCleanup()
         task.wait(1)
     end
      
@@ -386,11 +385,18 @@ startAutoRepair = function()
         task.wait(2)
     end
      
-    -- >>> FASE DE LIMPIEZA FINAL (OBLIGATORIA) <<<
-    updateStatus("LIMPIEZA FINAL: Borrando rastros...")
-    forceCleanup() -- Presiona Trash 3 veces
-    task.wait(1)   -- Espera a que se borren
-    forceCleanup() -- Asegura
+    -- >>> FASE DE LIMPIEZA FINAL V6.4 (OBLIGATORIA CON TEMPORIZADOR) <<<
+    local startTime = os.clock()
+    local elapsed = 0
+    
+    -- Usamos el CLEAN_DELAY configurado en el slider
+    while elapsed < CLEAN_DELAY do
+        local remaining = math.ceil(CLEAN_DELAY - elapsed)
+        updateStatus("LIMPIEZA FINAL: " .. remaining .. "s restantes...")
+        forceCleanup() -- Spamea el botón de borrar
+        task.wait(1)
+        elapsed = os.clock() - startTime
+    end
     
     isRepairRunning = false 
     updateStatus("LIBRE: Buscando nuevos VIPs...")
@@ -432,10 +438,6 @@ spawn(function()
         if currentMode ~= "BUY" or #autoBuyCarQueue == 0 or isAutoBuyCarBuying then continue end
 
         isAutoBuyCarBuying = true
-        
-        -- Limpieza PRE-Compra (Para evitar encontrar basura del ciclo anterior)
-        updateStatus("Limpieza Pre-Compra...")
-        forceCleanup()
         
         table.sort(autoBuyCarQueue, function(a, b) return a.percent < b.percent end)
         local item = table.remove(autoBuyCarQueue, 1)
@@ -490,4 +492,4 @@ if displayMessageEvent then
     end)
 end
 
-Rayfield:Notify({Title = "V6.3 Final", Content = "Limpieza extrema activada.", Duration = 5})
+Rayfield:Notify({Title = "V6.4 Final", Content = "Limpieza forzada aplicada.", Duration = 5})
